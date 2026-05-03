@@ -1,0 +1,98 @@
+﻿
+> samuha@1.0.0 lint D:\MPP\samuha
+> turbo lint "--filter" "samuha-dashboard"
+
+ΓÇó Packages in scope: samuha-dashboard
+ΓÇó Running lint in 1 packages
+ΓÇó Remote caching disabled
+samuha-dashboard:lint: cache miss, executing cd6e78c4c8d1cc5f
+samuha-dashboard:lint: 
+samuha-dashboard:lint: > samuha-dashboard@0.0.0 lint D:\MPP\samuha\apps\samuha-dashboard
+samuha-dashboard:lint: > eslint .
+samuha-dashboard:lint: 
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\context\AuthContext.tsx
+samuha-dashboard:lint:   27:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+samuha-dashboard:lint: 
+samuha-dashboard:lint: Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+samuha-dashboard:lint: * Update external systems with the latest state from React.
+samuha-dashboard:lint: * Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+samuha-dashboard:lint: 
+samuha-dashboard:lint: Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\context\AuthContext.tsx:27:13
+samuha-dashboard:lint:   25 |         const savedUser = localStorage.getItem('samuha_user');
+samuha-dashboard:lint:   26 |         if (savedUser) {
+samuha-dashboard:lint: > 27 |             setUser(JSON.parse(savedUser));
+samuha-dashboard:lint:      |             ^^^^^^^ Avoid calling setState() directly within an effect
+samuha-dashboard:lint:   28 |         }
+samuha-dashboard:lint:   29 |         setIsLoading(false);
+samuha-dashboard:lint:   30 |     }, []);  react-hooks/set-state-in-effect
+samuha-dashboard:lint:   54:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           react-refresh/only-export-components
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Activity\index.tsx
+samuha-dashboard:lint:   14:5  error  'CardHeader' is defined but never used      @typescript-eslint/no-unused-vars
+samuha-dashboard:lint:   15:5  error  'CardTitle' is defined but never used       @typescript-eslint/no-unused-vars
+samuha-dashboard:lint:   19:5  error  'Avatar' is defined but never used          @typescript-eslint/no-unused-vars
+samuha-dashboard:lint:   20:5  error  'AvatarFallback' is defined but never used  @typescript-eslint/no-unused-vars
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Deposits\History.tsx
+samuha-dashboard:lint:   13:5  error  'CardTitle' is defined but never used  @typescript-eslint/no-unused-vars
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Deposits\index.tsx
+samuha-dashboard:lint:    3:5  error  'Search' is defined but never used  @typescript-eslint/no-unused-vars
+samuha-dashboard:lint:   15:5  error  'Input' is defined but never used   @typescript-eslint/no-unused-vars
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Expenses\New.tsx
+samuha-dashboard:lint:   87:48  warning  Compilation Skipped: Use of incompatible library
+samuha-dashboard:lint: 
+samuha-dashboard:lint: This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Expenses\New.tsx:87:48
+samuha-dashboard:lint:   85 |                                     <Label className="text-sm font-bold text-foreground/70 ml-1">Expense Category</Label>
+samuha-dashboard:lint:   86 |                                     <Select
+samuha-dashboard:lint: > 87 |                                         value={form.watch('category')}
+samuha-dashboard:lint:      |                                                ^^^^ React Hook Form's `useForm()` API returns a `watch()` function which cannot be memoized safely.
+samuha-dashboard:lint:   88 |                                         onValueChange={(val) => form.setValue('category', val)}
+samuha-dashboard:lint:   89 |                                     >
+samuha-dashboard:lint:   90 |                                         <SelectTrigger className="w-full h-12 rounded-xl border-border bg-muted/30 focus:ring-primary/20">  react-hooks/incompatible-library
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Loans\Details.tsx
+samuha-dashboard:lint:   7:5  error  'Clock' is defined but never used  @typescript-eslint/no-unused-vars
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Loans\index.tsx
+samuha-dashboard:lint:   5:5  error  'ChevronRight' is defined but never used  @typescript-eslint/no-unused-vars
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Members\components\AddMemberModal.tsx
+samuha-dashboard:lint:   21:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Members\index.tsx
+samuha-dashboard:lint:   37:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Settings\AdminSettings.tsx
+samuha-dashboard:lint:   14:5  error  'CardContent' is defined but never used  @typescript-eslint/no-unused-vars
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Settings\GroupSettings.tsx
+samuha-dashboard:lint:   103:126  warning  Compilation Skipped: Use of incompatible library
+samuha-dashboard:lint: 
+samuha-dashboard:lint: This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Settings\GroupSettings.tsx:103:126
+samuha-dashboard:lint:   101 |                                         <div className="space-y-2">
+samuha-dashboard:lint:   102 |                                             <Label className="text-sm font-bold text-foreground/70 ml-1">Collection Deadline</Label>
+samuha-dashboard:lint: > 103 |                                             <Select onValueChange={(val) => form.setValue('collectionDeadline', val)} value={form.watch('collectionDeadline')}>
+samuha-dashboard:lint:       |                                                                                                                              ^^^^ React Hook Form's `useForm()` API returns a `watch()` function which cannot be memoized safely.
+samuha-dashboard:lint:   104 |                                                 <SelectTrigger className="w-full h-12 rounded-xl border-border bg-muted/30">
+samuha-dashboard:lint:   105 |                                                     <SelectValue placeholder="Select Deadline" />
+samuha-dashboard:lint:   106 |                                                 </SelectTrigger>  react-hooks/incompatible-library
+samuha-dashboard:lint: 
+samuha-dashboard:lint: Γ£û 16 problems (14 errors, 2 warnings)
+samuha-dashboard:lint: 
+samuha-dashboard:lint: ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.
+
+ Tasks:    0 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    3.086s 
+Failed:    samuha-dashboard#lint
+
+ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.

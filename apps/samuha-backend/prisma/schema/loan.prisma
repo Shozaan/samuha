@@ -1,0 +1,113 @@
+model Loan {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // Loan details
+  loanNumber      String       @unique // Format: FGFMS/2026/LOAN/000001
+  principalAmount Decimal      @db.Decimal(10, 2)
+  interestRate    Decimal      @db.Decimal(5, 2)
+  interestType    InterestType
+  durationMonths  Int
+
+  // Calculated amounts
+  totalInterest Decimal @db.Decimal(10, 2)
+  totalAmount   Decimal @db.Decimal(10, 2) // Principal + Interest
+  emiAmount     Decimal @db.Decimal(10, 2)
+
+  // Status
+  status  LoanStatus @default(REQUESTED)
+  purpose String?
+
+  // Approval
+  requestedAt  DateTime  @default(now())
+  approvedById String?
+  approvedAt   DateTime?
+  disbursedAt  DateTime?
+
+  // Completion
+  fullyPaidAt DateTime?
+
+  // Notes
+  notes String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  repayments  LoanRepayment[]
+  receipt     Receipt?
+  transaction Transaction?
+
+  @@map("loans")
+}
+
+enum LoanStatus {
+  REQUESTED
+  APPROVED
+  DISBURSED
+  ACTIVE
+  COMPLETED
+  REJECTED
+  DEFAULTED
+}
+
+model LoanRepayment {
+  id String @id @default(cuid())
+
+  // Relations
+  loanId String
+  loan   Loan   @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // EMI details
+  emiNumber       Int
+  dueDate         DateTime
+  principalAmount Decimal  @db.Decimal(10, 2)
+  interestAmount  Decimal  @db.Decimal(10, 2)
+  totalAmount     Decimal  @db.Decimal(10, 2)
+
+  // Payment details
+  status      RepaymentStatus @default(PENDING)
+  paidDate    DateTime?
+  paidAmount  Decimal?        @db.Decimal(10, 2)
+  paymentMode PaymentMode?
+
+  // Fine
+  fineAmount Decimal @default(0) @db.Decimal(10, 2)
+  fineId     String?
+  fine       Fine?   @relation(fields: [fineId], references: [id])
+
+  // Approval
+  confirmedById String?
+  confirmedAt   DateTime?
+
+  // Notes
+  notes String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  receipt     Receipt?
+  transaction Transaction?
+
+  @@map("loan_repayments")
+}
+
+enum RepaymentStatus {
+  PENDING
+  PAID
+  LATE
+  PARTIAL
+  WAIVED
+}

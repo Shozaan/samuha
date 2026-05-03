@@ -1,0 +1,54 @@
+model Fine {
+  id String @id @default(cuid())
+
+  // Relations
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // Fine details
+  fineType FineCategory
+  amount   Decimal      @db.Decimal(10, 2)
+  reason   String
+
+  // Status
+  status      FineStatus   @default(PENDING)
+  paidDate    DateTime?
+  paymentMode PaymentMode?
+
+  // Waiver
+  isWaived     Boolean   @default(false)
+  waivedBy     String?
+  waiverReason String?
+  waivedAt     DateTime?
+
+  // Approval
+  confirmedById String?
+  confirmedAt   DateTime?
+
+  // Notes
+  notes String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  deposits    Deposit[]
+  repayments  LoanRepayment[]
+  receipt     Receipt?
+  transaction Transaction?
+
+  @@map("fines")
+}
+
+enum FineCategory {
+  LATE_DEPOSIT
+  LATE_EMI
+  OTHER
+}
+
+enum FineStatus {
+  PENDING
+  PAID
+  WAIVED
+}

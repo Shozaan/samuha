@@ -1,0 +1,32 @@
+model GroupBalance {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+
+  // Balance tracking
+  balanceBefore Decimal @db.Decimal(10, 2)
+  balanceAfter  Decimal @db.Decimal(10, 2)
+  change        Decimal @db.Decimal(10, 2)
+
+  // Breakdown (running totals)
+  totalDeposits     Decimal @db.Decimal(10, 2)
+  totalLoansOut     Decimal @db.Decimal(10, 2)
+  totalRepaymentsIn Decimal @db.Decimal(10, 2)
+  totalFines        Decimal @db.Decimal(10, 2)
+  totalExpenses     Decimal @db.Decimal(10, 2)
+  totalBankInterest Decimal @db.Decimal(10, 2)
+
+  // Available balance (excluding loaned amount)
+  availableBalance Decimal @db.Decimal(10, 2)
+
+  // Metadata
+  createdAt DateTime @default(now())
+
+  @@index([groupId, createdAt])
+  @@map("group_balances")
+}

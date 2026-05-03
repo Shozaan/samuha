@@ -1,0 +1,19 @@
+model ReceiptCounter {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+
+  // Counter details
+  year        Int
+  receiptType ReceiptType
+  lastNumber  Int         @default(0)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  group     Group    @relation(fields: [groupId], references: [id])
+
+  @@unique([groupId, year, receiptType])
+  @@map("receipt_counters")
+}

@@ -1,0 +1,45 @@
+model MonthlyReport {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Report details
+  monthYear    String // Format: "YYYY-MM"
+  reportNumber String @unique // Format: FGFMS/2026/RPT/01
+
+  // Financial summary
+  openingBalance Decimal @db.Decimal(10, 2)
+  closingBalance Decimal @db.Decimal(10, 2)
+
+  totalDeposits     Decimal @db.Decimal(10, 2)
+  totalLoans        Decimal @db.Decimal(10, 2)
+  totalRepayments   Decimal @db.Decimal(10, 2)
+  totalFines        Decimal @db.Decimal(10, 2)
+  totalExpenses     Decimal @db.Decimal(10, 2)
+  totalBankInterest Decimal @db.Decimal(10, 2)
+
+  // Status
+  status ReportStatus @default(DRAFT)
+
+  // Generation
+  generatedById String?
+  generatedAt   DateTime?
+
+  // PDF
+  pdfUrl String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([groupId, monthYear])
+  @@map("monthly_reports")
+}
+
+enum ReportStatus {
+  DRAFT
+  GENERATED
+  LOCKED
+}

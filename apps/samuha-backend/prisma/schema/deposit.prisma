@@ -1,0 +1,56 @@
+model Deposit {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // Deposit details
+  monthYear String // Format: "YYYY-MM"
+  amount    Decimal  @db.Decimal(10, 2)
+  dueDate   DateTime
+
+  // Payment details
+  status      DepositStatus @default(PENDING)
+  paidDate    DateTime?
+  paymentMode PaymentMode?
+  voucherUrl  String?
+
+  // Fine
+  fineAmount Decimal @default(0) @db.Decimal(10, 2)
+  fineId     String?
+  fine       Fine?   @relation(fields: [fineId], references: [id])
+
+  // Advance/Partial
+  isAdvance       Boolean @default(false)
+  isPartial       Boolean @default(false)
+  parentDepositId String?
+
+  // Approval
+  confirmedById String?
+  confirmedAt   DateTime?
+
+  // Notes
+  notes String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  receipt     Receipt?
+  transaction Transaction?
+
+  @@unique([groupId, memberId, monthYear])
+  @@map("deposits")
+}
+
+enum DepositStatus {
+  PENDING
+  PAID
+  LATE
+  WAIVED
+}

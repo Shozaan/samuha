@@ -1,0 +1,65 @@
+model Receipt {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Receipt details
+  receiptNumber String      @unique // Format: FGFMS/2026/DEP/000001
+  receiptType   ReceiptType
+
+  // Transaction reference
+  depositId String?  @unique
+  deposit   Deposit? @relation(fields: [depositId], references: [id])
+
+  loanId String? @unique
+  loan   Loan?   @relation(fields: [loanId], references: [id])
+
+  repaymentId String?        @unique
+  repayment   LoanRepayment? @relation(fields: [repaymentId], references: [id])
+
+  fineId String? @unique
+  fine   Fine?   @relation(fields: [fineId], references: [id])
+
+  expenseId String?  @unique
+  expense   Expense? @relation(fields: [expenseId], references: [id])
+
+  // Details
+  memberName  String
+  amount      Decimal     @db.Decimal(10, 2)
+  paymentMode PaymentMode
+  description String
+
+  // Issuer
+  issuedBy String // Admin name
+  issuedAt DateTime @default(now())
+
+  // PDF
+  pdfUrl String?
+
+  // Notes
+  remarks String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+
+  @@map("receipts")
+}
+
+enum ReceiptType {
+  DEPOSIT
+  LOAN_DISBURSEMENT
+  LOAN_REPAYMENT
+  FINE
+  EXPENSE
+}
+
+enum PaymentMode {
+  CASH
+  BANK_TRANSFER
+  UPI
+  WALLET
+  CHEQUE
+  OTHER
+}

@@ -1,0 +1,37 @@
+model Group {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  // Status
+  status   GroupStatus @default(ACTIVE)
+  closedAt DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  members         Member[]
+  rules           GroupRule[]
+  deposits        Deposit[]
+  loans           Loan[]
+  expenses        Expense[]
+  bankInterests   BankInterest[]
+  transactions    Transaction[]
+  activityLogs    ActivityLog[]
+  receipts        Receipt[]
+  monthlyReports  MonthlyReport[]
+  receiptCounters ReceiptCounter[]
+  balances        GroupBalance[]
+  documents       Document[]
+  notifications   Notification[]
+
+  @@map("groups")
+}
+
+enum GroupStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}

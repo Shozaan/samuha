@@ -1,0 +1,43 @@
+model FinalSettlement {
+  id String @id @default(cuid())
+
+  // Relations
+  memberId String @unique
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // Calculation
+  totalMandatoryDeposits  Decimal @db.Decimal(10, 2)
+  totalExtraContributions Decimal @db.Decimal(10, 2)
+  memberShareOfEarnings   Decimal @db.Decimal(10, 2)
+  pendingLoanPrincipal    Decimal @db.Decimal(10, 2)
+
+  // Final amount
+  finalAmount Decimal @db.Decimal(10, 2)
+
+  // Status
+  status SettlementStatus @default(CALCULATED)
+
+  // Settlement
+  settledAt   DateTime?
+  settledBy   String?
+  paymentMode PaymentMode?
+
+  // PDF
+  pdfUrl String?
+
+  // Notes
+  notes String?
+
+  // Metadata
+  calculatedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("final_settlements")
+}
+
+enum SettlementStatus {
+  CALCULATED
+  APPROVED
+  SETTLED
+}

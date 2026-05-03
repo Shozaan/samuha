@@ -1,0 +1,58 @@
+model ActivityLog {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Activity details
+  activityType ActivityType
+  entityType   EntityType
+  entityId     String
+
+  // Actor
+  actorId   String
+  actorName String
+  actorRole MemberRole
+
+  // Details
+  action      String
+  description String
+
+  // Changes (JSON)
+  oldValue Json?
+  newValue Json?
+
+  // Metadata
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([groupId, activityType])
+  @@index([groupId, entityType, entityId])
+  @@map("activity_logs")
+}
+
+enum ActivityType {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  DISBURSE
+  CONFIRM
+  WAIVE
+  SETTLE
+}
+
+enum EntityType {
+  MEMBER
+  DEPOSIT
+  LOAN
+  REPAYMENT
+  FINE
+  EXPENSE
+  BANK_INTEREST
+  GROUP_RULE
+  SETTLEMENT
+}

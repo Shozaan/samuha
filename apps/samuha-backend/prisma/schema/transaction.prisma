@@ -1,0 +1,63 @@
+model Transaction {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Transaction details
+  transactionNumber String              @unique // Format: FGFMS/2026/TXN/000001
+  transactionType   TransactionType
+  category          TransactionCategory
+
+  // Amounts
+  debitAmount  Decimal? @db.Decimal(10, 2)
+  creditAmount Decimal? @db.Decimal(10, 2)
+  balance      Decimal  @db.Decimal(10, 2)
+
+  // Description
+  description String
+
+  // References (polymorphic)
+  depositId String?  @unique
+  deposit   Deposit? @relation(fields: [depositId], references: [id])
+
+  loanId String? @unique
+  loan   Loan?   @relation(fields: [loanId], references: [id])
+
+  repaymentId String?        @unique
+  repayment   LoanRepayment? @relation(fields: [repaymentId], references: [id])
+
+  fineId String? @unique
+  fine   Fine?   @relation(fields: [fineId], references: [id])
+
+  expenseId String?  @unique
+  expense   Expense? @relation(fields: [expenseId], references: [id])
+
+  bankInterestId String?       @unique
+  bankInterest   BankInterest? @relation(fields: [bankInterestId], references: [id])
+
+  // Balance snapshot
+  balanceSnapshot GroupBalance?
+
+  // Metadata
+  transactionDate DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@map("transactions")
+}
+
+enum TransactionType {
+  DEBIT
+  CREDIT
+}
+
+enum TransactionCategory {
+  DEPOSIT
+  LOAN_DISBURSEMENT
+  LOAN_REPAYMENT
+  FINE
+  EXPENSE
+  BANK_INTEREST
+  ADJUSTMENT
+}

@@ -1,0 +1,38 @@
+model BankInterest {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Interest details
+  amount        Decimal @db.Decimal(10, 2)
+  monthYear     String // Format: "YYYY-MM"
+  bankName      String?
+  accountNumber String?
+
+  // Status
+  status InterestStatus @default(PENDING)
+
+  // Confirmation
+  confirmedById String?
+  confirmedAt   DateTime?
+  creditedDate  DateTime?
+
+  // Notes
+  notes String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transaction Transaction?
+
+  @@map("bank_interests")
+}
+
+enum InterestStatus {
+  PENDING
+  CONFIRMED
+}

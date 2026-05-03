@@ -1,0 +1,23 @@
+model User {
+  id          String @id @default(cuid())
+  phoneNumber String @unique
+  name        String
+  userName    String @unique
+  email       String @unique
+
+  // Auth
+  passwordHash String?
+  otpCode      String?
+  otpExpiresAt DateTime?
+
+  // Metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
+  // Relations
+  members     Member[]
+  adminGroups Member[] @relation("AdminOf")
+
+  @@map("users")
+}

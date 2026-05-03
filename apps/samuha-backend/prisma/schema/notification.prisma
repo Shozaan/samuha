@@ -1,0 +1,72 @@
+model Notification {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // Notification details
+  notificationType NotificationType
+  title            String
+  message          String
+
+  // Reference (what triggered this?)
+  entityType EntityType?
+  entityId   String?
+
+  // Delivery
+  status NotificationStatus @default(PENDING)
+  sentAt DateTime?
+
+  // Read status
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  // Action
+  actionUrl   String?
+  actionLabel String?
+
+  // Priority
+  priority NotificationPriority @default(NORMAL)
+
+  // Metadata
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([memberId, isRead, createdAt])
+  @@index([groupId, notificationType])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  DEPOSIT_DUE
+  DEPOSIT_LATE
+  LOAN_APPROVED
+  LOAN_REJECTED
+  LOAN_DISBURSED
+  EMI_DUE
+  EMI_LATE
+  FINE_ADDED
+  EXPENSE_APPROVED
+  EXPENSE_REJECTED
+  MONTHLY_REPORT_READY
+  SETTLEMENT_READY
+  ADMIN_MESSAGE
+  SYSTEM_ALERT
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}

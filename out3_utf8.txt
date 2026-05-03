@@ -1,0 +1,58 @@
+﻿
+> samuha@1.0.0 lint D:\MPP\samuha
+> turbo lint "--filter" "samuha-dashboard"
+
+ΓÇó Packages in scope: samuha-dashboard
+ΓÇó Running lint in 1 packages
+ΓÇó Remote caching disabled
+samuha-dashboard:lint: cache miss, executing d25fbaa542a0320e
+samuha-dashboard:lint: 
+samuha-dashboard:lint: > samuha-dashboard@0.0.0 lint D:\MPP\samuha\apps\samuha-dashboard
+samuha-dashboard:lint: > eslint .
+samuha-dashboard:lint: 
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\context\AuthContext.tsx
+samuha-dashboard:lint:   20:1  warning  Unused eslint-disable directive (no problems were reported from 'react-refresh/only-export-components')
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Activity\index.tsx
+samuha-dashboard:lint:   17:5  error  'Badge' is defined but never used  @typescript-eslint/no-unused-vars
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Expenses\New.tsx
+samuha-dashboard:lint:   51:29  warning  Compilation Skipped: Use of incompatible library
+samuha-dashboard:lint: 
+samuha-dashboard:lint: This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Expenses\New.tsx:51:29
+samuha-dashboard:lint:   49 |     });
+samuha-dashboard:lint:   50 |
+samuha-dashboard:lint: > 51 |     const categoryWatcher = watch('category');
+samuha-dashboard:lint:      |                             ^^^^^ React Hook Form's `useForm()` API returns a `watch()` function which cannot be memoized safely.
+samuha-dashboard:lint:   52 |
+samuha-dashboard:lint:   53 |     function onSubmit(values: ExpenseValues) {
+samuha-dashboard:lint:   54 |         toast.success("Expense logged successfully", {  react-hooks/incompatible-library
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Settings\GroupSettings.tsx
+samuha-dashboard:lint:   57:39  warning  Compilation Skipped: Use of incompatible library
+samuha-dashboard:lint: 
+samuha-dashboard:lint: This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+samuha-dashboard:lint: 
+samuha-dashboard:lint: D:\MPP\samuha\apps\samuha-dashboard\src\pages\Settings\GroupSettings.tsx:57:39
+samuha-dashboard:lint:   55 |     });
+samuha-dashboard:lint:   56 |
+samuha-dashboard:lint: > 57 |     const collectionDeadlineWatcher = watch('collectionDeadline');
+samuha-dashboard:lint:      |                                       ^^^^^ React Hook Form's `useForm()` API returns a `watch()` function which cannot be memoized safely.
+samuha-dashboard:lint:   58 |
+samuha-dashboard:lint:   59 |     function onSubmit(values: GroupSettingsValues) {
+samuha-dashboard:lint:   60 |         toast.success("Group settings updated", {  react-hooks/incompatible-library
+samuha-dashboard:lint: 
+samuha-dashboard:lint: Γ£û 4 problems (1 error, 3 warnings)
+samuha-dashboard:lint:   0 errors and 1 warning potentially fixable with the `--fix` option.
+samuha-dashboard:lint: 
+samuha-dashboard:lint: ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.
+
+ Tasks:    0 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    2.915s 
+Failed:    samuha-dashboard#lint
+
+ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.

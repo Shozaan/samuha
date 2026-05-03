@@ -1,0 +1,50 @@
+model Document {
+  id String @id @default(cuid())
+
+  // Relations
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Document details
+  documentType DocumentType
+  fileName     String
+  fileSize     Int // in bytes
+  mimeType     String
+
+  // Storage
+  storageUrl  String // S3/Cloud storage URL
+  storagePath String // Path in storage
+
+  // Reference (what is this document for?)
+  entityType EntityType?
+  entityId   String?
+
+  // Metadata
+  description  String?
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+
+  // Version control
+  version  Int     @default(1)
+  isLatest Boolean @default(true)
+
+  // Access control
+  isPublic Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([groupId, documentType])
+  @@index([entityType, entityId])
+  @@map("documents")
+}
+
+enum DocumentType {
+  RECEIPT
+  MONTHLY_REPORT
+  YEARLY_REPORT
+  SETTLEMENT_REPORT
+  EXPENSE_INVOICE
+  LOAN_AGREEMENT
+  GROUP_RULES
+  OTHER
+}

@@ -1,0 +1,71 @@
+model GroupRule {
+  id String @id @default(cuid())
+
+  // Group relation
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Rule details
+  ruleType RuleType
+
+  // Membership rules
+  registrationFee Decimal? @db.Decimal(10, 2)
+
+  // Deposit rules
+  monthlyDepositAmount Decimal? @db.Decimal(10, 2)
+  depositDueDay        Int? // Day of month (1-31)
+  minDepositMonths     Int? // Months of deposit before loan eligibility
+
+  // Fine rules
+  lateFineType   FineType?
+  lateFineAmount Decimal?  @db.Decimal(10, 2)
+  lateFinePerDay Decimal?  @db.Decimal(10, 2)
+  lateDepositFineAmount Decimal?  @db.Decimal(10, 2) // Fixed late deposit fine
+  lateEmiPenaltyPercent Decimal?  @db.Decimal(5, 2)  // % per week
+  loanDefaultPenaltyPercent Decimal? @db.Decimal(5, 2) // % increase/month
+
+  // Loan rules
+  loanInterestRate      Decimal?      @db.Decimal(5, 2) // Percentage
+  loanInterestType      InterestType?
+  allowedLoanTenures    String?       // comma separated e.g. "3,6,12"
+  maxLoanDurationMonths Int?
+  minLoanAmount         Decimal?      @db.Decimal(10, 2)
+  maxLoanAmount         Decimal?      @db.Decimal(10, 2)
+  loanProcessingFeePercent Decimal?   @db.Decimal(5, 2)
+  savingsToLoanRatio    Decimal?      @db.Decimal(5, 2)
+  emiPaymentDay         Int?          // Day of month (1-31)
+
+  // Versioning
+  version       Int
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+
+  // Change tracking
+  previousRuleId String?
+  changedBy      String
+  changeNote     String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("group_rules")
+}
+
+enum RuleType {
+  DEPOSIT
+  FINE
+  LOAN
+  GENERAL
+}
+
+enum FineType {
+  FLAT
+  PER_DAY
+}
+
+enum InterestType {
+  FLAT
+  REDUCING
+}

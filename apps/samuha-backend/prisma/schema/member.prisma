@@ -1,0 +1,52 @@
+model Member {
+  id String @id @default(cuid())
+
+  // Group relation
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // User relation
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Member details
+  relation String? // e.g., "Brother", "Cousin"
+  joinDate DateTime  @default(now())
+  exitDate DateTime?
+
+  // Status
+  status MemberStatus @default(ACTIVE)
+  role   MemberRole   @default(MEMBER)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Admin relation (who added this member)
+  addedById String?
+  addedBy   User?   @relation("AdminOf", fields: [addedById], references: [id])
+
+  // Relations
+  deposits           Deposit[]
+  loans              Loan[]
+  loanRepayments     LoanRepayment[]
+  fines              Fine[]
+  expenseSuggestions Expense[]         @relation("SuggestedBy")
+  settlements        FinalSettlement[]
+  notifications      Notification[]
+
+  @@unique([groupId, userId])
+  @@map("members")
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  EXITED
+}
+
+enum MemberRole {
+  ADMIN
+  SECONDARY_ADMIN
+  MEMBER
+}
