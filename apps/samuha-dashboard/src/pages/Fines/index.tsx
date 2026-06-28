@@ -7,7 +7,8 @@ import {
     RefreshCw,
     AlertTriangle,
     XCircle,
-    Zap
+    Zap,
+    BadgeCheck
 } from 'lucide-react';
 import {
     Card,
@@ -21,6 +22,13 @@ import {
 } from '@sujan77/ui-components';
 import { useGlobalStore } from '../../store/store';
 import { useFinesByGroup, useFinesByMember, useMarkFinePaid, useWaiveFine, useRunFineEngine } from './hooks/useFines';
+import { PayFineModal } from './components/PayFineModal';
+import { RecordFineModal } from './components/RecordFineModal';
+import { BannerCard } from '../../components/BannerCard';
+import { useQuery } from '@tanstack/react-query';
+import { SettingsApi } from '../Settings/settings.api';
+import { useDeposits } from '../Deposits/hooks/useDeposits';
+import { useNavigate } from 'react-router-dom';
 
 type FilterStatus = 'ALL' | 'PENDING' | 'PAID' | 'WAIVED';
 
@@ -38,56 +46,127 @@ const FINE_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function FinesList() {
-    const { activeGroupId, activeMemberId, role } = useGlobalStore();
+    const { user, activeGroupId, activeMemberId, role } = useGlobalStore();
     const isAdmin = role?.toUpperCase() === 'ADMIN' || role?.toUpperCase() === 'SECONDARY_ADMIN';
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
+    const [selectedFineForPayment, setSelectedFineForPayment] = useState<any>(null);
+    const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+    const navigate = useNavigate();
 
     // Admins see group-wide fines, members see only their own
-    const { data: groupFinesRes, isLoading: loadingGroup } = useFinesByGroup(isAdmin ? (activeGroupId || '') : '');
-    const { data: memberFinesRes, isLoading: loadingMember } = useFinesByMember(!isAdmin ? (activeMemberId || '') : '');
+    const { data: groupFinesRes, isLoading: loadingGroup } = useFinesByGroup(activeGroupId || '');
+    const { data: memberFinesRes, isLoading: loadingMember } = useFinesByMember(activeMemberId || '');
 
     const markPaid = useMarkFinePaid();
     const waive = useWaiveFine();
     const runEngine = useRunFineEngine();
 
-    const rawFines: any[] = isAdmin
+    console.log('groupFinesRes', groupFinesRes);
+    console.log('memberFinesRes', memberFinesRes);
+    const rawFinesFromApi: any[] = isAdmin
         ? (groupFinesRes?.data || [])
         : (memberFinesRes?.data || []);
 
     const isLoading = isAdmin ? loadingGroup : loadingMember;
 
+    // Current month virtual fine computation
+    const now = new Date();
+    const { data: rulesData } = useQuery({
+        queryKey: ['group-rules', activeGroupId],
+        queryFn: () => SettingsApi.getGroupRules(activeGroupId || 'default'),
+        enabled: !!activeGroupId,
+    });
+    const rulesArray = Array.isArray(rulesData?.data) ? rulesData.data : [];
+    const rules = rulesArray[0] ?? null;
+    const depositDueDay = parseInt(rules?.depositDueDay ?? rules?.depositDeadline ?? '15', 10);
+    const lateDepositFineRate = parseFloat(rules?.lateDepositFineAmount ?? rules?.lateDepositFine ?? '0');
+
+    const { data: depositsRes } = useDeposits({ memberId: activeMemberId || '' });
+    const myDeposits = depositsRes?.data || [];
+
+    const currentMonthValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const dueDate = new Date(now.getFullYear(), now.getMonth(), depositDueDay);
+    const isDeadlinePassed = now > dueDate;
+
+    const myCurrentMonthDeposit = myDeposits.find((d: any) => d.memberId === activeMemberId && d.monthYear === currentMonthValue);
+    const isCurrentMonthPaid = myCurrentMonthDeposit?.status === 'PAID' || myCurrentMonthDeposit?.status === 'LATE';
+    const overduedays = isDeadlinePassed ? Math.floor((now.getTime() - dueDate.getTime()) / 86400000) : 0;
+
+    const virtualFineAmount = isDeadlinePassed && !isCurrentMonthPaid
+        ? (myCurrentMonthDeposit && parseFloat(myCurrentMonthDeposit.fineAmount || '0') > 0
+            ? parseFloat(myCurrentMonthDeposit.fineAmount)
+            : lateDepositFineRate * overduedays)
+        : 0;
+
+    const allFines = useMemo(() => {
+        const list = [...rawFinesFromApi];
+
+        const hasRealCurrentMonthFine = list.some((f: any) => {
+            const d = new Date(f.createdAt);
+            return f.memberId === activeMemberId && f.fineType === 'LATE_DEPOSIT' && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+
+        if (virtualFineAmount > 0 && !hasRealCurrentMonthFine) {
+            list.push({
+                id: 'virtual-deposit-fine',
+                memberId: activeMemberId,
+                monthYear: currentMonthValue,
+                fineType: 'LATE_DEPOSIT',
+                amount: virtualFineAmount,
+                status: 'PENDING',
+                createdAt: now.toISOString(),
+                reason: `Late Deposit Fine (${overduedays} days overdue)`,
+                isVirtual: true,
+                member: { user: { name: user?.name || 'You' } }
+            });
+        }
+        return list;
+    }, [rawFinesFromApi, isAdmin, virtualFineAmount, overduedays, activeMemberId, currentMonthValue]);
+
     const fines = useMemo(() => {
-        return rawFines.filter((f: any) => {
+        return allFines.filter((f: any) => {
             const memberName = f.member?.user?.name || '';
             const matchesSearch =
                 memberName.toLowerCase().includes(search.toLowerCase()) ||
-                f.reason.toLowerCase().includes(search.toLowerCase());
+                (f.reason || '').toLowerCase().includes(search.toLowerCase()) ||
+                (f.fineType || '').toLowerCase().includes(search.toLowerCase());
             const matchesStatus = statusFilter === 'ALL' || f.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-    }, [rawFines, search, statusFilter]);
+    }, [allFines, search, statusFilter]);
+
+    console.log(rawFinesFromApi, allFines, fines)
 
     // Stats
-    const totalOutstanding = rawFines
+    const totalOutstanding = allFines
         .filter((f: any) => f.status === 'PENDING')
         .reduce((sum: number, f: any) => sum + Number(f.amount), 0);
 
-    const totalCollected = rawFines
+    const totalCollected = allFines
         .filter((f: any) => f.status === 'PAID')
         .reduce((sum: number, f: any) => sum + Number(f.amount), 0);
 
-    const pendingCount = rawFines.filter((f: any) => f.status === 'PENDING').length;
+    const pendingCount = allFines.filter((f: any) => f.status === 'PENDING').length;
 
     const mostCommonType = useMemo(() => {
-        const counts = rawFines.reduce((acc: Record<string, number>, f: any) => {
+        const counts = allFines.reduce((acc: Record<string, number>, f: any) => {
             acc[f.fineType] = (acc[f.fineType] || 0) + 1;
             return acc;
         }, {});
         const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
         return top ? FINE_TYPE_LABELS[top[0]] || top[0] : 'N/A';
-    }, [rawFines]);
+    }, [allFines]);
+
+    // Pending Fines Logic (For the whole group/table)
+    const pendingFines = [...allFines.filter((f: any) => f.status === 'PENDING')];
+
+    // My Pending Fines Logic (For the personal banner)
+    const myPendingFines = pendingFines.filter((f: any) => f.memberId === activeMemberId);
+    const hasMyPendingFines = myPendingFines.length > 0;
+    const myPendingFineTotal = myPendingFines.reduce((sum: number, f: any) => sum + Number(f.amount), 0);
+    const myMostRecentFine = [...myPendingFines].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
     const handleMarkPaid = (fineId: string) => {
         if (window.confirm('Mark this fine as paid (Cash)?')) {
@@ -135,6 +214,13 @@ export default function FinesList() {
                             <Zap className="w-4 h-4" />
                             {runEngine.isPending ? 'Calculating...' : 'Run Fine Engine'}
                         </Button>
+                        <Button
+                            onClick={() => setIsRecordModalOpen(true)}
+                            className="bg-success text-white font-bold shadow-md flex items-center gap-2 hover:bg-success/90"
+                        >
+                            <BadgeCheck className="w-4 h-4" />
+                            Record Fine
+                        </Button>
                         <Button className="bg-primary text-primary-foreground font-bold shadow-md flex items-center gap-2">
                             <Download className="w-4 h-4" />
                             Export Log
@@ -142,6 +228,45 @@ export default function FinesList() {
                     </div>
                 )}
             </div>
+
+            <PayFineModal
+                isOpen={!!selectedFineForPayment}
+                onClose={() => setSelectedFineForPayment(null)}
+                fine={selectedFineForPayment}
+            />
+
+            <RecordFineModal
+                isOpen={isRecordModalOpen}
+                onClose={() => setIsRecordModalOpen(false)}
+            />
+
+            {/* My Outstanding Fines Banner */}
+            <BannerCard
+                variant={hasMyPendingFines ? "destructive" : "success"}
+                icon={hasMyPendingFines ? <AlertTriangle className="w-8 h-8" /> : <BadgeCheck className="w-8 h-8" />}
+                title={
+                    hasMyPendingFines
+                        ? `You have ${myPendingFines.length} pending fine${myPendingFines.length !== 1 ? 's' : ''} to resolve`
+                        : `You have no pending fines! ✓`
+                }
+                subtitle={
+                    hasMyPendingFines
+                        ? "Clear outstanding fines to avoid further penalties."
+                        : "Great job keeping everything cleared up."
+                }
+                rightLabel={hasMyPendingFines ? "Total Fines" : undefined}
+                rightValue={hasMyPendingFines ? `NPR ${myPendingFineTotal.toLocaleString()}` : undefined}
+                rightAction={
+                    hasMyPendingFines ? (
+                        <Button
+                            onClick={() => setSelectedFineForPayment(myMostRecentFine)}
+                            className="w-full md:w-auto font-bold uppercase tracking-widest text-[10px] py-1.5 h-10 rounded-lg shadow-md text-white bg-destructive hover:bg-destructive/90"
+                        >
+                            Pay Recent Fine
+                        </Button>
+                    ) : undefined
+                }
+            />
 
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -175,7 +300,7 @@ export default function FinesList() {
                             NPR {totalCollected.toLocaleString()}
                         </Typography>
                         <Typography variant="small" className="text-[10px] text-muted-foreground mt-2 font-medium">
-                            {rawFines.filter((f: any) => f.status === 'PAID').length} fines cleared
+                            {allFines.filter((f: any) => f.status === 'PAID').length} fines cleared
                         </Typography>
                     </CardContent>
                 </Card>
@@ -187,7 +312,7 @@ export default function FinesList() {
                         </Typography>
                         <Typography variant="p" className="text-lg font-bold text-foreground">{mostCommonType}</Typography>
                         <Typography variant="small" className="text-[10px] text-primary font-bold mt-1 uppercase">
-                            {rawFines.length} total fines
+                            {allFines.length} total fines
                         </Typography>
                     </CardContent>
                 </Card>
@@ -216,7 +341,7 @@ export default function FinesList() {
                 </CardHeader>
 
                 {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
+                <div className="overflow-x-auto max-md:hidden">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-border bg-muted/50">
@@ -226,7 +351,7 @@ export default function FinesList() {
                                 <th className="px-8 py-4 text-xs font-bold text-muted-foreground uppercase">Amount</th>
                                 <th className="px-8 py-4 text-xs font-bold text-muted-foreground uppercase">Date</th>
                                 <th className="px-8 py-4 text-xs font-bold text-muted-foreground uppercase text-center">Status</th>
-                                {isAdmin && <th className="px-8 py-4 text-xs font-bold text-muted-foreground uppercase text-right">Actions</th>}
+                                <th className="px-8 py-4 text-xs font-bold text-muted-foreground uppercase text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -281,9 +406,9 @@ export default function FinesList() {
                                                 {fine.status}
                                             </span>
                                         </td>
-                                        {isAdmin && (
-                                            <td className="px-8 py-5 text-right">
-                                                {fine.status === 'PENDING' ? (
+                                        <td className="px-8 py-5 text-right">
+                                            {fine.status === 'PENDING' ? (
+                                                isAdmin ? (
                                                     <div className="flex items-center justify-end gap-2">
                                                         <Button
                                                             variant="ghost"
@@ -305,13 +430,20 @@ export default function FinesList() {
                                                         </Button>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex items-center justify-end gap-1 text-success">
-                                                        <CheckCircle2 className="w-4 h-4" />
-                                                        <span className="text-[10px] font-bold uppercase">{fine.status}</span>
-                                                    </div>
-                                                )}
-                                            </td>
-                                        )}
+                                                    <Button
+                                                        onClick={() => setSelectedFineForPayment(fine)}
+                                                        className="text-xs font-bold bg-destructive hover:bg-destructive/90 text-white uppercase h-8 px-4 rounded-lg shadow-md"
+                                                    >
+                                                        Pay Now
+                                                    </Button>
+                                                )
+                                            ) : (
+                                                <div className="flex items-center justify-end gap-1 text-success">
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                    <span className="text-[10px] font-bold uppercase">{fine.status}</span>
+                                                </div>
+                                            )}
+                                        </td>
                                     </tr>
                                 );
                             })}
@@ -359,22 +491,33 @@ export default function FinesList() {
                                         </div>
                                     </div>
                                 </div>
-                                {isAdmin && fine.status === 'PENDING' && (
-                                    <div className="flex gap-2">
+                                {fine.status === 'PENDING' && (
+                                    isAdmin ? (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                onClick={() => handleMarkPaid(fine.id)}
+                                                disabled={fine.isVirtual}
+                                                className="flex-1 bg-success text-white font-bold uppercase tracking-widest text-[10px] py-1 h-9 rounded-lg"
+                                            >
+                                                Mark Paid
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => handleWaive(fine.id)}
+                                                disabled={fine.isVirtual}
+                                                className="flex-1 border-border text-muted-foreground font-bold uppercase tracking-widest text-[10px] py-1 h-9 rounded-lg"
+                                            >
+                                                Waive
+                                            </Button>
+                                        </div>
+                                    ) : (
                                         <Button
-                                            onClick={() => handleMarkPaid(fine.id)}
-                                            className="flex-1 bg-success text-white font-bold uppercase tracking-widest text-[10px] py-1 h-9 rounded-lg"
+                                            onClick={() => setSelectedFineForPayment(fine)}
+                                            className="w-full bg-destructive text-white font-bold uppercase tracking-widest text-[10px] py-1 h-9 rounded-lg shadow-md"
                                         >
-                                            Mark Paid
+                                            Pay Fine Now
                                         </Button>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => handleWaive(fine.id)}
-                                            className="flex-1 border-border text-muted-foreground font-bold uppercase tracking-widest text-[10px] py-1 h-9 rounded-lg"
-                                        >
-                                            Waive
-                                        </Button>
-                                    </div>
+                                    )
                                 )}
                             </div>
                         );

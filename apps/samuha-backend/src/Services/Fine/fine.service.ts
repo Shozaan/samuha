@@ -254,6 +254,82 @@ class FineService {
         return count;
     }
 
+    /** Create a fine from a virtual payment request */
+    async createVirtualFine(details: { memberId: string; amount: number; reason: string; fineType: string; monthYear?: string }) {
+        // If there's already a fine for this deposit, just use it
+        if (details.fineType === 'LATE_DEPOSIT' && details.monthYear) {
+            const deposit = await this.prisma.deposit.findFirst({
+                where: {
+                    memberId: details.memberId,
+                    monthYear: details.monthYear,
+                }
+            });
+
+            if (deposit) {
+                if (deposit.fineId) {
+                    const existingFine = await this.prisma.fine.findUnique({ where: { id: deposit.fineId } });
+                    if (existingFine) return existingFine;
+                }
+
+                // Create the fine and link it to the deposit
+                const newFine = await this.prisma.fine.create({
+                    data: {
+                        memberId: details.memberId,
+                        fineType: 'LATE_DEPOSIT',
+                        amount: details.amount,
+                        reason: details.reason,
+                        status: 'PENDING',
+                    }
+                });
+
+                await this.prisma.deposit.update({
+                    where: { id: deposit.id },
+                    data: {
+                        fineId: newFine.id,
+                        fineAmount: details.amount,
+                        status: 'LATE',
+                    }
+                });
+
+                return newFine;
+            }
+        }
+
+        // Fallback for other virtual fines if needed
+        return this.prisma.fine.create({
+            data: {
+                memberId: details.memberId,
+                fineType: details.fineType as any,
+                amount: details.amount,
+                reason: details.reason,
+                status: 'PENDING',
+            }
+        });
+    }
+
+    /** Create a fine manually by admin */
+    async createManualFine(data: {
+        memberId: string;
+        amount: number;
+        fineType: string;
+        reason: string;
+        status?: string;
+        paymentMode?: string;
+        paidDate?: Date;
+    }) {
+        return this.prisma.fine.create({
+            data: {
+                memberId: data.memberId,
+                amount: data.amount,
+                fineType: data.fineType as any,
+                reason: data.reason,
+                status: (data.status || 'PENDING') as any,
+                paymentMode: data.paymentMode as any,
+                paidDate: data.paidDate || (data.status === 'PAID' ? new Date() : null),
+            },
+        });
+    }
+
     /** Get all fines for a member */
     async getByMember(memberId: string) {
         return this.prisma.fine.findMany({

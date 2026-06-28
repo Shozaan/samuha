@@ -15,11 +15,19 @@ export const useFinesByMember = (memberId: string) =>
         enabled: !!memberId,
     });
 
+export const useCreateFine = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: any) => finesApi.create(data),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['fines'] }),
+    });
+};
+
 export const useMarkFinePaid = () => {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: ({ fineId, paymentMode }: { fineId: string; paymentMode: string }) =>
-            finesApi.markPaid(fineId, paymentMode),
+        mutationFn: ({ fineId, paymentMode, virtualDetails }: { fineId: string; paymentMode: string; virtualDetails?: any }) =>
+            finesApi.markPaid(fineId, paymentMode, virtualDetails),
         onSuccess: () => qc.invalidateQueries({ queryKey: ['fines'] }),
     });
 };

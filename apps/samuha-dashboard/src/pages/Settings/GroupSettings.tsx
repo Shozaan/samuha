@@ -77,7 +77,7 @@ export default function GroupSettings() {
     useEffect(() => {
         async function fetchRules() {
             try {
-                const result = await SettingsApi.getGroupRules(activeGroupId);
+                const result = await SettingsApi.getGroupRules(activeGroupId || '0');
                 const rules = Array.isArray(result?.data) ? result.data[0] : result?.data;
                 if (rules) {
                     reset({

@@ -63,11 +63,37 @@ class FineController {
      */
     async markPaid(req: Request<{ fineId: string }>, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { paymentMode } = req.body;
-            const fine = await fineService.markPaid(req.params.fineId, paymentMode || 'CASH');
+            const { paymentMode, virtualDetails } = req.body;
+            let finalFineId = req.params.fineId;
+            
+            // If it's a virtual fine, create it first
+            if (finalFineId === 'virtual-deposit-fine' && virtualDetails) {
+                const newFine = await fineService.createVirtualFine(virtualDetails);
+                finalFineId = newFine.id;
+            }
+
+            const fine = await fineService.markPaid(finalFineId, paymentMode || 'CASH');
             res.status(200).json({
                 success: true,
                 message: 'Fine marked as paid',
+                data: fine,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * @route   POST /api/fines
+     * @desc    Create a fine manually
+     * @access  Admin
+     */
+    async createFine(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const fine = await fineService.createManualFine(req.body);
+            res.status(201).json({
+                success: true,
+                message: 'Fine created successfully',
                 data: fine,
             });
         } catch (error) {

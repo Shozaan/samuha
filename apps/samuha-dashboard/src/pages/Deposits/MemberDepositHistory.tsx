@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, AlertTriangle, CalendarX, BellRing } from 'lucide-react';
 import {
     Card,
     CardContent,
@@ -13,6 +13,9 @@ import {
 import { useGlobalStore } from '../../store/store';
 import { useMember } from '../Members/hooks/useMembers';
 import { useDeposits } from './hooks/useDeposits';
+import { useQuery } from '@tanstack/react-query';
+import { SettingsApi } from '../Settings/settings.api';
+import { BannerCard } from '../../components/BannerCard';
 
 const STATUS_CONFIG = {
     PAID: { label: 'Paid', className: 'bg-success/10 text-success border-success/20', icon: CheckCircle2 },
@@ -32,15 +35,79 @@ export default function MemberDepositHistory() {
         groupId: activeGroupId || '',
         limit: 200,
     });
+    const { data: rulesData } = useQuery({
+        queryKey: ['group-rules', activeGroupId],
+        queryFn: () => SettingsApi.getGroupRules(activeGroupId || 'default'),
+        enabled: !!activeGroupId,
+    });
 
     const member = memberResponse?.data;
     const deposits = depositsResponse?.data || [];
 
-    // Stats
-    const paidDeposits = deposits.filter((d: any) => d.status === 'PAID' || d.status === 'LATE');
-    const pendingDeposits = deposits.filter((d: any) => d.status === 'PENDING');
+    // Rules
+    const rulesArray = Array.isArray(rulesData?.data) ? rulesData.data : [];
+    const rules = rulesArray[0] ?? null;
+    const lateDepositFineRate = parseFloat(rules?.lateDepositFineAmount ?? rules?.lateDepositFine ?? '0');
+    const depositDueDay = parseInt(rules?.depositDueDay ?? rules?.depositDeadline ?? '15', 10);
+    const monthlyDepositAmount = parseFloat(rules?.monthlyDepositAmount ?? rules?.mandatoryDeposit ?? '0');
+
+    // Current month
+    const now = new Date();
+    const currentMonthValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const dueDate = new Date(now.getFullYear(), now.getMonth(), depositDueDay);
+    const isDeadlinePassed = now > dueDate;
+    const overduedays = isDeadlinePassed ? Math.floor((now.getTime() - dueDate.getTime()) / 86400000) : 0;
+    const daysRemaining = !isDeadlinePassed ? Math.ceil((dueDate.getTime() - now.getTime()) / 86400000) : 0;
+    const currentMonthDeposit = deposits.find((d: any) => d.monthYear === currentMonthValue);
+    const isCurrentMonthPaid = currentMonthDeposit?.status === 'PAID';
+
+    // Fine calculation: rate × days overdue (prefer server fineAmount if set)
+    const getComputedFine = (deposit: any) => {
+        const serverFine = parseFloat(deposit.fineAmount || '0');
+        if (serverFine > 0) return serverFine;
+        if (deposit.status === 'PENDING' && deposit.dueDate) {
+            const due = new Date(deposit.dueDate);
+            if (now > due) {
+                const days = Math.floor((now.getTime() - due.getTime()) / 86400000);
+                return lateDepositFineRate * days;
+            }
+        }
+        return 0;
+    };
+
+    // Current month fine
+    const currentMonthFine = isDeadlinePassed && !isCurrentMonthPaid
+        ? (currentMonthDeposit && parseFloat(currentMonthDeposit.fineAmount || '0') > 0
+            ? parseFloat(currentMonthDeposit.fineAmount)
+            : lateDepositFineRate * overduedays)
+        : 0;
+
+    // Stats (from DB)
+    const paidDeposits = deposits.filter((d: any) => d.status === 'PAID');
+    const pendingDeposits = deposits.filter((d: any) => d.status === 'PENDING' || d.status === 'LATE');
+    const overdueDeposits = pendingDeposits.filter((d: any) => new Date(d.dueDate) < now);
+    
     const totalPaid = paidDeposits.reduce((sum: number, d: any) => sum + parseFloat(d.amount), 0);
-    const totalFines = deposits.reduce((sum: number, d: any) => sum + parseFloat(d.fineAmount || '0'), 0);
+    let totalPendingAmount = pendingDeposits.reduce((sum: number, d: any) => sum + parseFloat(d.amount), 0);
+    let totalFines = deposits.reduce((sum: number, d: any) => sum + getComputedFine(d), 0);
+    
+    let pendingCount = pendingDeposits.length;
+    let overdueCount = overdueDeposits.length;
+
+    // If current month is completely missing from DB, add it to our owed totals
+    const isCurrentMonthPendingInDB = currentMonthDeposit?.status === 'PENDING';
+    const isCurrentMonthMissing = !isCurrentMonthPaid && !isCurrentMonthPendingInDB;
+    
+    if (isCurrentMonthMissing) {
+        pendingCount += 1;
+        totalPendingAmount += monthlyDepositAmount;
+        if (isDeadlinePassed) {
+            overdueCount += 1;
+            totalFines += currentMonthFine;
+        }
+    }
+
+    const totalMonths = deposits.length + (isCurrentMonthMissing ? 1 : 0);
 
     if (isMemberLoading || isDepositsLoading) {
         return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading deposit history...</div>;
@@ -87,30 +154,100 @@ export default function MemberDepositHistory() {
                 </CardContent>
             </Card>
 
+            {/* Current Month Banner */}
+            <BannerCard
+                variant={isCurrentMonthPaid ? 'success' : isDeadlinePassed ? 'destructive' : 'warning'}
+                icon={isCurrentMonthPaid ? <CheckCircle2 className="w-8 h-8" /> : isDeadlinePassed ? <CalendarX className="w-8 h-8" /> : <BellRing className="w-8 h-8" />}
+                title={
+                    isCurrentMonthPaid
+                        ? 'This month\'s deposit is paid ✓'
+                        : isDeadlinePassed
+                            ? `Overdue by ${overduedays} day${overduedays !== 1 ? 's' : ''} — Fine accumulating`
+                            : `Deposit due in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`
+                }
+                subtitle={
+                    <>
+                        {isCurrentMonthPaid
+                            ? `Paid for ${currentMonthValue}`
+                            : `Due by ${dueDate.toLocaleDateString()}`}
+                        {monthlyDepositAmount > 0 && ` · NPR ${monthlyDepositAmount.toLocaleString()} required`}
+                    </>
+                }
+                /*
+                rightLabel={!isCurrentMonthPaid && isDeadlinePassed && currentMonthFine > 0 ? 'Total Fine' : undefined}
+                rightValue={!isCurrentMonthPaid && isDeadlinePassed && currentMonthFine > 0 ? `NPR ${currentMonthFine.toLocaleString()}` : undefined}
+                rightSubtext={
+                    !isCurrentMonthPaid && isDeadlinePassed && currentMonthFine > 0 && lateDepositFineRate > 0 ? (
+                        <div className="text-[10px] text-destructive/60 font-bold mt-1">
+                            NPR {lateDepositFineRate.toLocaleString()}/day × {overduedays}d
+                        </div>
+                    ) : null
+                }
+                */
+            />
+
             {/* Summary Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="border-border bg-card">
+                {/* Total Paid */}
+                <Card className="border-success/20 bg-success/5">
                     <CardContent className="p-5">
                         <Typography variant="small" className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider block mb-1">Total Paid</Typography>
                         <Typography variant="h4" className="text-xl font-black text-success">NPR {totalPaid.toLocaleString()}</Typography>
+                        <Typography variant="small" className="text-[10px] text-muted-foreground font-bold mt-1 block">
+                            {paidDeposits.length} month{paidDeposits.length !== 1 ? 's' : ''} paid
+                        </Typography>
                     </CardContent>
                 </Card>
-                <Card className="border-border bg-card">
+
+                {/* Total Fines Card commented out
+                <Card className={`${totalFines > 0 ? 'border-destructive/20 bg-destructive/5' : 'border-border bg-card'}`}>
                     <CardContent className="p-5">
                         <Typography variant="small" className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider block mb-1">Total Fines</Typography>
-                        <Typography variant="h4" className="text-xl font-black text-destructive">NPR {totalFines.toLocaleString()}</Typography>
+                        <Typography variant="h4" className={`text-xl font-black ${totalFines > 0 ? 'text-destructive' : 'text-foreground'}`}>
+                            NPR {totalFines.toLocaleString()}
+                        </Typography>
+                        {totalFines > 0 && lateDepositFineRate > 0 ? (
+                            <Typography variant="small" className="text-[10px] text-destructive/70 font-bold mt-1 block">
+                                NPR {lateDepositFineRate.toLocaleString()}/day · {overdueCount} overdue
+                            </Typography>
+                        ) : (
+                            <Typography variant="small" className="text-[10px] text-success font-bold mt-1 block">No fines</Typography>
+                        )}
                     </CardContent>
                 </Card>
+                */}
+
+                {/* Paid Months */}
                 <Card className="border-border bg-card">
                     <CardContent className="p-5">
                         <Typography variant="small" className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider block mb-1">Paid Months</Typography>
-                        <Typography variant="h4" className="text-xl font-black text-foreground">{paidDeposits.length}</Typography>
+                        <Typography variant="h4" className="text-xl font-black text-foreground">
+                            {paidDeposits.length}
+                            <span className="text-sm font-medium text-muted-foreground"> / {totalMonths}</span>
+                        </Typography>
+                        <div className="mt-2 h-1.5 w-full bg-muted rounded-full">
+                            <div
+                                className="h-full bg-success rounded-full transition-all duration-700"
+                                style={{ width: totalMonths > 0 ? `${Math.round((paidDeposits.length / totalMonths) * 100)}%` : '0%' }}
+                            />
+                        </div>
                     </CardContent>
                 </Card>
-                <Card className="border-border bg-card">
+
+                {/* Pending */}
+                <Card className={`${pendingCount > 0 ? 'border-warning/20 bg-warning/5' : 'border-border bg-card'}`}>
                     <CardContent className="p-5">
                         <Typography variant="small" className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider block mb-1">Pending</Typography>
-                        <Typography variant="h4" className="text-xl font-black text-warning">{pendingDeposits.length}</Typography>
+                        <Typography variant="h4" className={`text-xl font-black ${pendingCount > 0 ? 'text-warning' : 'text-foreground'}`}>
+                            {pendingCount} month{pendingCount !== 1 ? 's' : ''}
+                        </Typography>
+                        {totalPendingAmount > 0 ? (
+                            <Typography variant="small" className="text-[10px] text-warning/80 font-bold mt-1 block">
+                                NPR {totalPendingAmount.toLocaleString()} owed
+                            </Typography>
+                        ) : (
+                            <Typography variant="small" className="text-[10px] text-success font-bold mt-1 block">All clear</Typography>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -135,18 +272,24 @@ export default function MemberDepositHistory() {
                                         <th className="px-6 py-4">Due Date</th>
                                         <th className="px-6 py-4">Paid Date</th>
                                         <th className="px-6 py-4 text-center">Status</th>
-                                        <th className="px-6 py-4 text-right">Fine</th>
+                                        {/* <th className="px-6 py-4 text-right">Fine</th> */}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {[...deposits].sort((a: any, b: any) => b.monthYear.localeCompare(a.monthYear)).map((deposit: any) => {
                                         const cfg = STATUS_CONFIG[deposit.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PENDING;
                                         const Icon = cfg.icon;
-                                        const fine = parseFloat(deposit.fineAmount || '0');
+                                        const fine = getComputedFine(deposit);
+                                        const isOverdue = deposit.status === 'PENDING' && new Date(deposit.dueDate) < now;
+                                        const dueD = new Date(deposit.dueDate);
+                                        const overdueDays = isOverdue ? Math.floor((now.getTime() - dueD.getTime()) / 86400000) : 0;
                                         return (
                                             <tr key={deposit.id} className="hover:bg-muted/30 transition-colors">
                                                 <td className="px-6 py-4">
                                                     <Typography variant="p" className="font-bold text-foreground">{deposit.monthYear}</Typography>
+                                                    {isOverdue && (
+                                                        <span className="text-[9px] text-destructive font-black uppercase">{overdueDays}d overdue</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <Typography variant="p" className="font-semibold text-foreground">NPR {parseFloat(deposit.amount).toLocaleString()}</Typography>
@@ -167,12 +310,22 @@ export default function MemberDepositHistory() {
                                                         {cfg.label}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-right">
+                                                <td className="px-6 py-4 text-right text-muted-foreground italic text-[10px]">
+                                                    {/* Fines commented out
                                                     {fine > 0 ? (
-                                                        <span className="text-destructive font-bold text-sm">NPR {fine.toLocaleString()}</span>
+                                                        <div>
+                                                            <span className="text-destructive font-bold text-sm block">NPR {fine.toLocaleString()}</span>
+                                                            {isOverdue && lateDepositFineRate > 0 && (
+                                                                <span className="text-[9px] text-destructive/60 font-bold">
+                                                                    {lateDepositFineRate}/day × {overdueDays}d
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     ) : (
                                                         <span className="text-muted-foreground text-xs">—</span>
                                                     )}
+                                                    */}
+                                                    -
                                                 </td>
                                             </tr>
                                         );

@@ -28,6 +28,7 @@ import { useGroupMembers } from '../Members/hooks/useMembers';
 import { SettingsApi } from '../Settings/settings.api';
 import { useQuery } from '@tanstack/react-query';
 import { BellRing, BadgeCheck } from 'lucide-react';
+import { BannerCard } from '../../components/BannerCard';
 
 const getRecentMonths = () => {
     const months = [];
@@ -68,14 +69,14 @@ export default function DepositsGrid() {
         limit: 100,
     });
     const myDeposits = (myDepositsResponse?.data || []).sort((a: any, b: any) => b.monthYear.localeCompare(a.monthYear)).slice(0, 6);
-    const myTotalPaid = myDeposits.filter((d: any) => d.status === 'PAID' || d.status === 'LATE').reduce((s: number, d: any) => s + parseFloat(d.amount), 0);
+    const myTotalPaid = myDeposits.filter((d: any) => d.status === 'PAID').reduce((s: number, d: any) => s + parseFloat(d.amount), 0);
     const myPendingFines = myDeposits.reduce((s: number, d: any) => s + parseFloat(d.fineAmount || '0'), 0);
 
     // Missed deposit deadlines (overdue + unpaid)
     const now = new Date();
     const allMyDeposits = myDepositsResponse?.data || [];
     const missedDepositDeadlines = allMyDeposits
-        .filter((d: any) => d.status === 'PENDING' && new Date(d.dueDate) < now)
+        .filter((d: any) => (d.status === 'PENDING' || d.status === 'LATE') && new Date(d.dueDate) < now)
         .map((d: any) => ({
             ...d,
             daysOverdue: Math.floor((now.getTime() - new Date(d.dueDate).getTime()) / 86400000),
@@ -90,10 +91,12 @@ export default function DepositsGrid() {
         queryFn: () => SettingsApi.getGroupRules(activeGroupId || 'default'),
         enabled: !!activeGroupId,
     });
-    const rules = rulesData?.data;
-    const monthlyDepositAmount = parseFloat(rules?.monthlyDepositAmount || rules?.mandatoryDeposit || '0');
-    const depositDueDay = parseInt(rules?.depositDueDay || rules?.depositDeadline || '15', 10);
-    const lateDepositFine = parseFloat(rules?.lateDepositFineAmount || rules?.lateDepositFine || '0');
+    // rulesData.data is an array of rules; pick the first active one
+    const rulesArray = Array.isArray(rulesData?.data) ? rulesData.data : [];
+    const rules = rulesArray[0] ?? null;
+    const monthlyDepositAmount = parseFloat(rules?.monthlyDepositAmount ?? rules?.mandatoryDeposit ?? '0');
+    const depositDueDay = parseInt(rules?.depositDueDay ?? rules?.depositDeadline ?? '15', 10);
+    const lateDepositFineRate = parseFloat(rules?.lateDepositFineAmount ?? rules?.lateDepositFine ?? '0');
 
     // Current month deposit status for the logged-in member
     const currentMonthValue = currentMonthData.value; // e.g. "2026-05"
@@ -108,17 +111,23 @@ export default function DepositsGrid() {
     const myCurrentMonthDeposit = allMyDeposits.find(
         (d: any) => d.monthYear === currentMonthValue
     );
-    const isCurrentMonthPaid = myCurrentMonthDeposit?.status === 'PAID' || myCurrentMonthDeposit?.status === 'LATE';
-    const isCurrentMonthPending = myCurrentMonthDeposit?.status === 'PENDING';
-    // Not in DB at all = not paid yet
+    const isCurrentMonthPaid = myCurrentMonthDeposit?.status === 'PAID';
+    // Fine = daily fine rate × number of overdue days
+    // If the DB record already has a fineAmount (server-computed), use it;
+    // otherwise calculate client-side as: lateDepositFineAmount × daysOverdue
+    const overduedays = isDeadlinePassed
+        ? Math.floor((now.getTime() - dueDate.getTime()) / 86400000)
+        : 0;
     const currentMonthFine = isDeadlinePassed && !isCurrentMonthPaid
-        ? (myCurrentMonthDeposit ? parseFloat(myCurrentMonthDeposit.fineAmount || '0') : lateDepositFine)
+        ? (myCurrentMonthDeposit && parseFloat(myCurrentMonthDeposit.fineAmount || '0') > 0
+            ? parseFloat(myCurrentMonthDeposit.fineAmount)
+            : lateDepositFineRate * overduedays)
         : 0;
 
     // Aggregations
-    const currentMonthDeposits = allDeposits.filter((d: any) => d.monthYear === currentMonthData.value && (d.status === 'PAID' || d.status === 'LATE'));
+    const currentMonthDeposits = allDeposits.filter((d: any) => d.monthYear === currentMonthData.value && d.status === 'PAID');
     const totalCollectedCurrentMonth = currentMonthDeposits.reduce((sum: number, d: any) => sum + parseFloat(d.amount), 0);
-    const pendingDeposits = allDeposits.filter((d: any) => d.status === 'PENDING');
+    const pendingDeposits = allDeposits.filter((d: any) => d.status === 'PENDING' || d.status === 'LATE');
 
     // Calculate defaulters for current month (members who haven't paid)
     const activeMembers = members.filter((m: any) => m.status === 'ACTIVE');
@@ -148,7 +157,6 @@ export default function DepositsGrid() {
 
     const handleApprove = (id: string) => {
         if (window.confirm("Approve this deposit request?")) {
-            // we update to PAID
             updateDeposit.mutate({ id, data: { status: 'PAID' } });
         }
     };
@@ -205,92 +213,69 @@ export default function DepositsGrid() {
             />
 
             {/* ── This Month's Deposit Banner ── */}
-            {activeMemberId && monthlyDepositAmount > 0 && (
-                <Card className={`overflow-hidden border-2 transition-all ${
-                    isCurrentMonthPaid
-                        ? 'border-success/30 bg-success/5'
-                        : isDeadlinePassed
-                            ? 'border-destructive/40 bg-destructive/5'
-                            : 'border-warning/30 bg-warning/5'
-                }`}>
-                    <CardContent className="p-0">
-                        <div className="flex flex-col md:flex-row items-stretch">
-                            {/* Left: Status indicator */}
-                            <div className={`flex items-center gap-5 p-6 flex-1 ${
-                                isCurrentMonthPaid ? '' : isDeadlinePassed ? '' : ''
-                            }`}>
-                                <div className={`p-4 rounded-2xl shrink-0 ${
-                                    isCurrentMonthPaid
-                                        ? 'bg-success/15 text-success'
-                                        : isDeadlinePassed
-                                            ? 'bg-destructive/15 text-destructive'
-                                            : 'bg-warning/15 text-warning'
-                                }`}>
-                                    {isCurrentMonthPaid
-                                        ? <BadgeCheck className="w-8 h-8" />
-                                        : isDeadlinePassed
-                                            ? <CalendarX className="w-8 h-8" />
-                                            : <BellRing className="w-8 h-8" />
-                                    }
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                        <Typography variant="h4" className={`text-xl font-black ${
-                                            isCurrentMonthPaid ? 'text-success' : isDeadlinePassed ? 'text-destructive' : 'text-warning'
-                                        }`}>
-                                            {isCurrentMonthPaid
-                                                ? `${currentMonthData.label} Deposit — Paid ✓`
-                                                : isDeadlinePassed
-                                                    ? `${currentMonthData.label} Deposit — Overdue!`
-                                                    : `${currentMonthData.label} Deposit — Due Soon`
-                                            }
-                                        </Typography>
-                                    </div>
-                                    <Typography variant="small" className="text-muted-foreground text-xs">
-                                        {isCurrentMonthPaid
-                                            ? `You have paid your deposit for ${currentMonthData.label}. Great job!`
-                                            : isDeadlinePassed
-                                                ? `Deadline was ${dueDate.toLocaleDateString()} — ${daysOverdueCurrentMonth} day${daysOverdueCurrentMonth !== 1 ? 's' : ''} overdue. Fines are accumulating.`
-                                                : `Pay by ${dueDate.toLocaleDateString()} — ${daysOverdueCurrentMonth} day${daysOverdueCurrentMonth !== 1 ? 's' : ''} remaining to avoid a fine.`
-                                        }
-                                    </Typography>
-                                </div>
-                            </div>
-
-                            {/* Right: Amounts */}
-                            <div className={`flex md:flex-col items-center md:items-end justify-between md:justify-center gap-4 px-6 py-4 md:py-6 border-t md:border-t-0 md:border-l ${
-                                isCurrentMonthPaid ? 'border-success/20' : isDeadlinePassed ? 'border-destructive/20' : 'border-warning/20'
-                            } bg-background/40 min-w-[180px]`}>
-                                <div className="text-center md:text-right">
-                                    <Typography variant="small" className="text-[10px] text-muted-foreground uppercase font-black tracking-widest block mb-0.5">Deposit Amount</Typography>
-                                    <Typography variant="h4" className="text-2xl font-black text-foreground">
-                                        NPR {monthlyDepositAmount.toLocaleString()}
-                                    </Typography>
-                                </div>
-                                {!isCurrentMonthPaid && isDeadlinePassed && currentMonthFine > 0 && (
-                                    <div className="text-center md:text-right">
-                                        <Typography variant="small" className="text-[10px] text-muted-foreground uppercase font-black tracking-widest block mb-0.5">Fine</Typography>
-                                        <Typography variant="h4" className="text-xl font-black text-destructive">
-                                            + NPR {currentMonthFine.toLocaleString()}
-                                        </Typography>
-                                    </div>
-                                )}
-                                {!isCurrentMonthPaid && (
-                                    <Button
-                                        onClick={() => setIsMakeModalOpen(true)}
-                                        className={`font-bold text-xs uppercase tracking-widest px-5 py-2.5 rounded-xl shadow-lg ${
-                                            isDeadlinePassed
-                                                ? 'bg-destructive hover:bg-destructive/90 text-white shadow-destructive/20'
-                                                : 'bg-warning hover:bg-warning/90 text-white shadow-warning/20'
-                                        }`}
-                                    >
-                                        Pay Now
-                                    </Button>
-                                )}
-                            </div>
+            {activeMemberId && (
+                <BannerCard
+                    variant={isCurrentMonthPaid ? 'success' : isDeadlinePassed ? 'destructive' : 'warning'}
+                    icon={isCurrentMonthPaid ? <BadgeCheck className="w-8 h-8" /> : isDeadlinePassed ? <CalendarX className="w-8 h-8" /> : <BellRing className="w-8 h-8" />}
+                    title={
+                        isCurrentMonthPaid
+                            ? `${currentMonthData.label} Deposit — Paid ✓`
+                            : isDeadlinePassed
+                                ? `${currentMonthData.label} Deposit — Overdue!`
+                                : `${currentMonthData.label} Deposit — New Month Started`
+                    }
+                    badges={
+                        <div className="flex gap-2">
+                            {!isCurrentMonthPaid && !isDeadlinePassed && (
+                                <span className="text-[10px] bg-warning/20 text-warning px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-warning/30">
+                                    Not Paid Yet
+                                </span>
+                            )}
+                            {isDeadlinePassed && !isCurrentMonthPaid && (
+                                <span className="text-[10px] bg-destructive text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest animate-pulse">
+                                    {daysOverdueCurrentMonth} day{daysOverdueCurrentMonth !== 1 ? 's' : ''} overdue
+                                </span>
+                            )}
                         </div>
-                    </CardContent>
-                </Card>
+                    }
+                    subtitle={
+                        isCurrentMonthPaid
+                            ? `You have paid your deposit for ${currentMonthData.label}. Great job!`
+                            : isDeadlinePassed
+                                ? `Deadline was ${dueDate.toLocaleDateString()} — fines are accumulating. Pay immediately to stop further charges.`
+                                : `New month, new deposit! Pay by ${dueDate.toLocaleDateString()} (${daysOverdueCurrentMonth} day${daysOverdueCurrentMonth !== 1 ? 's' : ''} remaining) to avoid a fine.`
+                    }
+                    rightLabel={isCurrentMonthPaid ? 'Amount Paid' : 'Amount Due'}
+                    rightValue={`NPR ${monthlyDepositAmount.toLocaleString()}`}
+                    /*
+                    rightSubtext={
+                        !isCurrentMonthPaid && isDeadlinePassed && currentMonthFine > 0 ? (
+                            <div className="flex items-center justify-center md:justify-end gap-1.5 text-destructive font-bold text-xs mt-2 bg-destructive/10 px-3 py-1.5 rounded-lg border border-destructive/20">
+                                <span>+ NPR {currentMonthFine.toLocaleString()} Fine</span>
+                                {lateDepositFineRate > 0 && (
+                                    <span className="text-[9px] text-destructive/60 ml-1">
+                                        ({lateDepositFineRate}/day × {daysOverdueCurrentMonth}d)
+                                    </span>
+                                )}
+                            </div>
+                        ) : null
+                    }
+                    */
+                    rightAction={
+                        !isCurrentMonthPaid ? (
+                            <Button
+                                onClick={() => setIsMakeModalOpen(true)}
+                                className={`w-full md:w-auto font-bold uppercase tracking-widest text-[10px] py-1.5 h-10 rounded-lg shadow-md ${
+                                    isDeadlinePassed 
+                                        ? 'bg-destructive hover:bg-destructive/90 text-white' 
+                                        : 'bg-warning hover:bg-warning/90 text-white'
+                                }`}
+                            >
+                                Pay Now
+                            </Button>
+                        ) : undefined
+                    }
+                />
             )}
 
             {/* ── My Deposits Section ── */}
@@ -312,12 +297,14 @@ export default function DepositsGrid() {
                                     <Typography variant="small" className="text-[10px] text-muted-foreground uppercase font-black block">Total Paid</Typography>
                                     <Typography variant="p" className="font-black text-success">NPR {myTotalPaid.toLocaleString()}</Typography>
                                 </div>
+                                {/*
                                 {myPendingFines > 0 && (
                                     <div>
                                         <Typography variant="small" className="text-[10px] text-muted-foreground uppercase font-black block">Fines</Typography>
                                         <Typography variant="p" className="font-black text-destructive">NPR {myPendingFines.toLocaleString()}</Typography>
                                     </div>
                                 )}
+                                */}
                             </div>
                         </div>
                     </CardHeader>
@@ -330,17 +317,17 @@ export default function DepositsGrid() {
                             <div className="divide-y divide-border">
                                 {myDeposits.map((deposit: any) => {
                                     const fine = parseFloat(deposit.fineAmount || '0');
-                                    const isPaid = deposit.status === 'PAID' || deposit.status === 'LATE';
+                                    const isPaid = deposit.status === 'PAID';
                                     const isLate = deposit.status === 'LATE';
                                     return (
                                         <div key={deposit.id} className="px-6 py-4 flex items-center justify-between hover:bg-primary/5 transition-colors">
                                             <div className="flex items-center gap-4">
                                                 <div className={`p-2 rounded-xl ${
-                                                    isPaid && !isLate ? 'bg-success/10 text-success' :
+                                                    isPaid ? 'bg-success/10 text-success' :
                                                     isLate ? 'bg-warning/10 text-warning' :
                                                     'bg-orange-400/10 text-orange-400'
                                                 }`}>
-                                                    {isPaid && !isLate ? <CheckCircle2 className="w-4 h-4" /> :
+                                                    {isPaid ? <CheckCircle2 className="w-4 h-4" /> :
                                                      isLate ? <AlertTriangle className="w-4 h-4" /> :
                                                      <Clock className="w-4 h-4" />}
                                                 </div>
@@ -353,11 +340,13 @@ export default function DepositsGrid() {
                                             </div>
                                             <div className="text-right space-y-1">
                                                 <Typography variant="p" className="font-bold text-foreground text-sm">NPR {parseFloat(deposit.amount).toLocaleString()}</Typography>
+                                                {/*
                                                 {fine > 0 && (
                                                     <span className="text-[10px] font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/20 block">
                                                         Fine: NPR {fine.toLocaleString()}
                                                     </span>
                                                 )}
+                                                */}
                                             </div>
                                         </div>
                                     );
@@ -387,12 +376,19 @@ export default function DepositsGrid() {
                                     <Typography variant="small" className="text-destructive/70 text-xs">Pay as soon as possible to avoid further fines</Typography>
                                 </div>
                             </div>
+                            {/*
                             {totalMissedFines > 0 && (
-                                <div className="text-right">
-                                    <Typography variant="small" className="text-[10px] text-muted-foreground uppercase font-black block">Total Fines Accrued</Typography>
-                                    <Typography variant="p" className="font-black text-destructive text-lg">NPR {totalMissedFines.toLocaleString()}</Typography>
+                                <div className="text-right flex items-center gap-4">
+                                    <div>
+                                        <Typography variant="small" className="text-[10px] text-muted-foreground uppercase font-black block">Total Fines Accrued</Typography>
+                                        <Typography variant="p" className="font-black text-destructive text-lg">NPR {totalMissedFines.toLocaleString()}</Typography>
+                                    </div>
+                                    <Button onClick={() => navigate('/fines')} className="bg-destructive hover:bg-destructive/90 text-white font-bold uppercase tracking-widest text-[10px] h-8 px-4 rounded-lg shadow-md">
+                                        Pay Now
+                                    </Button>
                                 </div>
                             )}
+                            */}
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -412,11 +408,13 @@ export default function DepositsGrid() {
                                     </div>
                                     <div className="text-right space-y-1">
                                         <Typography variant="p" className="font-bold text-foreground text-sm">NPR {parseFloat(d.amount).toLocaleString()}</Typography>
+                                        {/*
                                         {d.fine > 0 && (
                                             <span className="text-[10px] font-black text-white bg-destructive px-2.5 py-0.5 rounded-full block">
                                                 Fine: NPR {d.fine.toLocaleString()}
                                             </span>
                                         )}
+                                        */}
                                     </div>
                                 </div>
                             ))}
@@ -583,10 +581,12 @@ export default function DepositsGrid() {
                                     <Typography variant="p" className="font-bold text-foreground">{member.name}</Typography>
                                     <Typography variant="small" className="text-[10px] text-muted-foreground uppercase font-bold truncate w-32 block">ID: {member.id}</Typography>
                                 </div>
+                                {/*
                                 <div className="text-right">
                                     <Typography variant="small" className="text-[10px] text-muted-foreground uppercase font-black block mb-1">Active Fine</Typography>
                                     <Typography variant="p" className="text-xs font-bold text-destructive">NPR 0</Typography>
                                 </div>
+                                */}
                             </div>
 
                             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
