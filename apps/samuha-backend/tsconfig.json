@@ -9,5 +9,5 @@
     "forceConsistentCasingInFileNames": true,
     "rootDir": "./src"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "prisma/prisma.ts"]
 }
