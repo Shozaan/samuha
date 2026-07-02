@@ -135,6 +135,44 @@ class LoanController {
     // --- REPAYMENTS ---
 
     /**
+     * @route   GET /api/loans/repayments/pending?groupId=
+     * @desc    Get all pending/late repayments for a group (admin view)
+     * @access  Private
+     */
+    async getPendingRepayments(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const { groupId } = req.query;
+            if (!groupId) {
+                res.status(400).json({ success: false, message: 'groupId is required' });
+                return;
+            }
+            const repayments = await loanService.getPendingRepayments(groupId as string);
+            res.status(200).json({ success: true, data: repayments });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * @route   GET /api/loans/repayments/member?memberId=
+     * @desc    Get repayment schedule for a member's active loan(s)
+     * @access  Private
+     */
+    async getMemberRepayments(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const { memberId } = req.query;
+            if (!memberId) {
+                res.status(400).json({ success: false, message: 'memberId is required' });
+                return;
+            }
+            const repayments = await loanService.getMemberRepayments(memberId as string);
+            res.status(200).json({ success: true, data: repayments });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
      * @route   GET /api/loans/:id/repayments
      * @desc    Get all repayments for a loan
      * @access  Private

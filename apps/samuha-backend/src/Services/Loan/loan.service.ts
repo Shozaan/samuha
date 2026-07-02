@@ -1,6 +1,8 @@
 import { Prisma, Loan, LoanRepayment, LoanStatus, RepaymentStatus } from '@prisma/client';
 import prismaService from "../prismaService";
 import activityService from '../Activity/activity.service';
+import transactionService from '../Transaction/transaction.service';
+import balanceService from '../Balance/balance.service';
 
 interface Actor { id: string; name: string; role: string; }
 
@@ -133,6 +135,19 @@ class LoanService {
      * Update loan
      */
     async update(id: string, data: Prisma.LoanUpdateInput, actor?: Actor): Promise<Loan> {
+        // On first approval, calculate 1% service charge and embed it in the update
+        let serviceChargeAmount: number | null = null;
+        if ((data.status as string) === 'APPROVED') {
+            const existing = await (this.prisma.loan as any).findUnique({
+                where: { id },
+                select: { principalAmount: true, serviceChargeAmount: true }
+            });
+            if (existing && !existing.serviceChargeAmount) {
+                serviceChargeAmount = Math.round(Number(existing.principalAmount) * 0.01 * 100) / 100;
+                (data as any).serviceChargeAmount = serviceChargeAmount;
+            }
+        }
+
         const updatedLoan = await this.prisma.loan.update({ where: { id }, data });
 
         // If newly activated, generate the repayment schedule!
@@ -160,6 +175,40 @@ class LoanService {
 
                 await this.prisma.loanRepayment.createMany({ data: scheduleData });
             }
+        }
+
+        // Record service charge as a CREDIT transaction
+        if (serviceChargeAmount !== null) {
+            const latestBalance = await balanceService.getLatestByGroupId(updatedLoan.groupId);
+            const prevBalance = latestBalance ? Number(latestBalance.balanceAfter) : 0;
+            const newBalance = prevBalance + serviceChargeAmount;
+            const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const year = new Date().getFullYear();
+
+            const tx = await transactionService.create({
+                group: { connect: { id: updatedLoan.groupId } },
+                transactionNumber: `SMH/${year}/TXN/${randomHex}`,
+                transactionType: 'CREDIT',
+                category: 'ADJUSTMENT',
+                creditAmount: serviceChargeAmount,
+                balance: newBalance,
+                description: `Service charge (1%) on loan ${updatedLoan.loanNumber} — NPR ${serviceChargeAmount.toLocaleString()}`,
+            });
+
+            await balanceService.create({
+                group: { connect: { id: updatedLoan.groupId } },
+                transaction: { connect: { id: tx.id } },
+                balanceBefore: prevBalance,
+                balanceAfter: newBalance,
+                change: serviceChargeAmount,
+                totalDeposits: latestBalance ? Number(latestBalance.totalDeposits) : 0,
+                totalLoansOut: latestBalance ? Number(latestBalance.totalLoansOut) : 0,
+                totalRepaymentsIn: latestBalance ? Number(latestBalance.totalRepaymentsIn) : 0,
+                totalFines: latestBalance ? Number(latestBalance.totalFines) : 0,
+                totalExpenses: latestBalance ? Number(latestBalance.totalExpenses) : 0,
+                totalBankInterest: latestBalance ? Number(latestBalance.totalBankInterest) : 0,
+                availableBalance: newBalance - (latestBalance ? Number(latestBalance.totalLoansOut) : 0),
+            });
         }
 
         // Log activity
@@ -208,6 +257,63 @@ class LoanService {
     }
 
     // --- REPAYMENT METHODS ---
+
+    /**
+     * Get all pending/late repayments for a group (admin overview)
+     */
+    async getPendingRepayments(groupId: string) {
+        return await this.prisma.loanRepayment.findMany({
+            where: {
+                loan: { groupId },
+                status: { in: ['PENDING', 'LATE'] }
+            },
+            include: {
+                loan: {
+                    select: {
+                        id: true,
+                        loanNumber: true,
+                        principalAmount: true,
+                        emiAmount: true,
+                        durationMonths: true,
+                        status: true,
+                        member: {
+                            select: {
+                                id: true,
+                                user: { select: { name: true } }
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { dueDate: 'asc' }
+        });
+    }
+
+    /**
+     * Get full repayment schedule for a member's active loan
+     */
+    async getMemberRepayments(memberId: string) {
+        return await this.prisma.loanRepayment.findMany({
+            where: {
+                memberId,
+                loan: { status: { in: ['ACTIVE', 'DISBURSED'] } }
+            },
+            include: {
+                loan: {
+                    select: {
+                        id: true,
+                        loanNumber: true,
+                        principalAmount: true,
+                        totalAmount: true,
+                        emiAmount: true,
+                        durationMonths: true,
+                        disbursedAt: true,
+                    }
+                }
+            },
+            orderBy: [{ loan: { createdAt: 'asc' } }, { emiNumber: 'asc' }]
+        });
+    }
 
     /**
      * Get repayments for a loan

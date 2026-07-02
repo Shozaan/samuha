@@ -14,6 +14,7 @@ class DashboardService {
             activeLoansAgg,
             repaymentAgg,
             fineAgg,
+            serviceChargeAgg,
             recentTransactions
         ] = await Promise.all([
             // 1. Member count
@@ -43,7 +44,12 @@ class DashboardService {
                 _sum: { amount: true },
                 where: { member: { groupId }, status: 'PAID' }
             }),
-            // 6. Recent activity
+            // 6. Service charges collected (1% on loan approval)
+            this.prisma.loan.aggregate({
+                _sum: { serviceChargeAmount: true } as any,
+                where: { groupId, serviceChargeAmount: { not: null } } as any
+            }),
+            // 7. Recent activity
             this.prisma.transaction.findMany({
                 where: { groupId },
                 orderBy: { createdAt: 'desc' },
@@ -61,10 +67,11 @@ class DashboardService {
         const loansOut = activeLoansAgg._sum.principalAmount?.toNumber() || 0;
         const repaymentsIn = repaymentAgg._sum.principalAmount?.toNumber() || 0;
         const finesCollected = fineAgg._sum.amount?.toNumber() || 0;
+        const totalServiceCharges = (serviceChargeAgg as any)._sum.serviceChargeAmount?.toNumber() || 0;
 
         // Total group fund = all money that came in
-        // = Deposits + Fines collected + Repayments received
-        const totalGroupFund = totalDeposits + finesCollected + repaymentsIn;
+        // = Deposits + Fines + Repayments + Service charges (1% on loan approval)
+        const totalGroupFund = totalDeposits + finesCollected + repaymentsIn + totalServiceCharges;
 
         // Available balance = total fund minus what's currently lent out (not yet repaid)
         const activeLoans = Math.max(0, loansOut - repaymentsIn);

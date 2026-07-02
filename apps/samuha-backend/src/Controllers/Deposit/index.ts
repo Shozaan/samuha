@@ -9,7 +9,9 @@ class DepositController {
      */
     async create(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const deposit = await depositService.create(req.body);
+            const actor = req.body.actor;
+            const { actor: _actor, ...depositData } = req.body;
+            const deposit = await depositService.create(depositData, actor);
             res.status(201).json({
                 success: true,
                 message: 'Deposit created successfully',
@@ -103,7 +105,9 @@ class DepositController {
                 return;
             }
 
-            const updated = await depositService.update(id, req.body);
+            const actor = req.body.actor;
+            const { actor: _actor, ...updateData } = req.body;
+            const updated = await depositService.update(id, updateData, actor);
 
             res.status(200).json({
                 success: true,

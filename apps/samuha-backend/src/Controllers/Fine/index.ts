@@ -63,16 +63,16 @@ class FineController {
      */
     async markPaid(req: Request<{ fineId: string }>, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { paymentMode, virtualDetails } = req.body;
+            const { paymentMode, virtualDetails, actor } = req.body;
             let finalFineId = req.params.fineId;
-            
+
             // If it's a virtual fine, create it first
             if (finalFineId === 'virtual-deposit-fine' && virtualDetails) {
                 const newFine = await fineService.createVirtualFine(virtualDetails);
                 finalFineId = newFine.id;
             }
 
-            const fine = await fineService.markPaid(finalFineId, paymentMode || 'CASH');
+            const fine = await fineService.markPaid(finalFineId, paymentMode || 'CASH', actor);
             res.status(200).json({
                 success: true,
                 message: 'Fine marked as paid',
@@ -90,7 +90,9 @@ class FineController {
      */
     async createFine(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const fine = await fineService.createManualFine(req.body);
+            const actor = req.body.actor;
+            const { actor: _actor, ...fineData } = req.body;
+            const fine = await fineService.createManualFine(fineData, actor);
             res.status(201).json({
                 success: true,
                 message: 'Fine created successfully',
@@ -108,8 +110,8 @@ class FineController {
      */
     async waive(req: Request<{ fineId: string }>, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { waivedBy, reason } = req.body;
-            const fine = await fineService.waive(req.params.fineId, waivedBy, reason);
+            const { waivedBy, reason, actor } = req.body;
+            const fine = await fineService.waive(req.params.fineId, waivedBy, reason, actor);
             res.status(200).json({
                 success: true,
                 message: 'Fine waived',

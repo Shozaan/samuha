@@ -11,6 +11,8 @@ import fineRoutes from '../Routes/Fines';
 import activityRoutes from '../Routes/Activities';
 import ruleRoutes from '../Routes/Rules';
 import dashboardRoutes from '../Routes/Dashboard';
+import reportRoutes from '../Routes/Reports';
+import expenseRoutes from '../Routes/Expenses';
 import prismaService from '../Services/prismaService';
 
 const router = Router();
@@ -65,6 +67,7 @@ router.use('/fines', fineRoutes);
 router.use('/activities', activityRoutes);
 router.use('/rules', ruleRoutes);
 router.use('/dashboard', dashboardRoutes);
-// router.use('/expenses', expenseRoutes);
+router.use('/reports', reportRoutes);
+router.use('/expenses', expenseRoutes);
 
 export default router;

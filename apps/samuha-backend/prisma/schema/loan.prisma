@@ -16,9 +16,10 @@ model Loan {
   durationMonths  Int
 
   // Calculated amounts
-  totalInterest Decimal @db.Decimal(10, 2)
-  totalAmount   Decimal @db.Decimal(10, 2) // Principal + Interest
-  emiAmount     Decimal @db.Decimal(10, 2)
+  totalInterest       Decimal  @db.Decimal(10, 2)
+  totalAmount         Decimal  @db.Decimal(10, 2) // Principal + Interest
+  emiAmount           Decimal  @db.Decimal(10, 2)
+  serviceChargeAmount Decimal? @db.Decimal(10, 2) // 1% of principal, collected on approval
 
   // Status
   status  LoanStatus @default(REQUESTED)

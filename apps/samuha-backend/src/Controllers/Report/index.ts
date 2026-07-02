@@ -1,7 +1,120 @@
 import { Request, Response, NextFunction } from 'express';
 import reportService from '../../Services/Report/report.service';
+import prismaService from '../../Services/prismaService';
+
+const prisma = prismaService.prisma;
 
 class ReportController {
+    /**
+     * @route   GET /api/reports/monthly?groupId=&year=
+     * @desc    Compute monthly financial summaries from live data
+     * @access  Private
+     */
+    async getMonthly(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const { groupId, year } = req.query as { groupId?: string; year?: string };
+
+            if (!groupId) {
+                res.status(400).json({ success: false, message: 'groupId is required' });
+                return;
+            }
+
+            const targetYear = year ? parseInt(year) : new Date().getFullYear();
+            const now = new Date();
+
+            // All YYYY-MM for the target year, capped at current month
+            const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const months: string[] = Array.from({ length: 12 }, (_, i) => {
+                const m = String(i + 1).padStart(2, '0');
+                return `${targetYear}-${m}`;
+            }).filter(m => m <= currentMonthYear);
+
+            const yearStart = new Date(`${targetYear}-01-01`);
+            const yearEnd = new Date(`${targetYear + 1}-01-01`);
+
+            const [deposits, loans, repayments, fines] = await Promise.all([
+                prisma.deposit.findMany({
+                    where: { groupId, monthYear: { in: months }, status: 'PAID' },
+                    select: { monthYear: true, amount: true }
+                }),
+                prisma.loan.findMany({
+                    where: {
+                        groupId,
+                        disbursedAt: { gte: yearStart, lt: yearEnd },
+                        status: { in: ['ACTIVE', 'COMPLETED', 'DEFAULTED'] }
+                    },
+                    select: { disbursedAt: true, principalAmount: true }
+                }),
+                prisma.loanRepayment.findMany({
+                    where: {
+                        loan: { groupId },
+                        status: 'PAID',
+                        paidDate: { gte: yearStart, lt: yearEnd }
+                    },
+                    select: { paidDate: true, totalAmount: true }
+                }),
+                prisma.fine.findMany({
+                    where: {
+                        member: { groupId },
+                        status: 'PAID',
+                        paidDate: { gte: yearStart, lt: yearEnd }
+                    },
+                    select: { paidDate: true, amount: true }
+                }),
+            ]);
+
+            const toMY = (d: Date) => {
+                const date = new Date(d);
+                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            };
+
+            const sumByMonth = <T>(items: T[], keyFn: (item: T) => string | null, valFn: (item: T) => number): Record<string, number> => {
+                const map: Record<string, number> = {};
+                items.forEach(item => {
+                    const k = keyFn(item);
+                    if (k) map[k] = (map[k] || 0) + valFn(item);
+                });
+                return map;
+            };
+
+            const depByMonth = sumByMonth(deposits, d => d.monthYear, d => Number(d.amount));
+            const loanByMonth = sumByMonth(loans, l => l.disbursedAt ? toMY(l.disbursedAt) : null, l => Number(l.principalAmount));
+            const repByMonth = sumByMonth(repayments, r => r.paidDate ? toMY(r.paidDate) : null, r => Number(r.totalAmount));
+            const fineByMonth = sumByMonth(fines, f => f.paidDate ? toMY(f.paidDate) : null, f => Number(f.amount));
+
+            const data = months
+                .map(monthYear => ({
+                    monthYear,
+                    totalDeposits: depByMonth[monthYear] || 0,
+                    totalLoans: loanByMonth[monthYear] || 0,
+                    totalRepayments: repByMonth[monthYear] || 0,
+                    totalFines: fineByMonth[monthYear] || 0,
+                }))
+                .filter(m => m.totalDeposits + m.totalLoans + m.totalRepayments + m.totalFines > 0)
+                .reverse();
+
+            // Determine available years from earliest group deposit
+            const earliest = await prisma.deposit.findFirst({
+                where: { groupId },
+                orderBy: { createdAt: 'asc' },
+                select: { createdAt: true }
+            });
+            const earliestYear = earliest ? new Date(earliest.createdAt).getFullYear() : targetYear;
+            const availableYears = Array.from(
+                { length: now.getFullYear() - earliestYear + 1 },
+                (_, i) => now.getFullYear() - i
+            );
+
+            res.status(200).json({
+                success: true,
+                data,
+                meta: { year: targetYear, availableYears },
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     /**
      * @route   POST /api/reports
      * @desc    Create a new report

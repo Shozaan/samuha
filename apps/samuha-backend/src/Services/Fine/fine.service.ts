@@ -1,4 +1,7 @@
 import prismaService from '../prismaService';
+import activityService from '../Activity/activity.service';
+
+interface Actor { id: string; name: string; role: string; }
 
 const DEPOSIT_FINE_MAX_PER_MONTH = 300;
 const EMI_FINE_RATE_PER_DAY = 0.005; // 0.5%
@@ -316,8 +319,8 @@ class FineService {
         status?: string;
         paymentMode?: string;
         paidDate?: Date;
-    }) {
-        return this.prisma.fine.create({
+    }, actor?: Actor) {
+        const fine = await this.prisma.fine.create({
             data: {
                 memberId: data.memberId,
                 amount: data.amount,
@@ -327,7 +330,24 @@ class FineService {
                 paymentMode: data.paymentMode as any,
                 paidDate: data.paidDate || (data.status === 'PAID' ? new Date() : null),
             },
-        });
+            include: { member: { select: { groupId: true } } }
+        }) as any;
+
+        if (actor) {
+            await activityService.create({
+                group: { connect: { id: fine.member.groupId } },
+                activityType: 'CREATE',
+                entityType: 'FINE',
+                entityId: fine.id,
+                actorId: actor.id,
+                actorName: actor.name,
+                actorRole: actor.role as any,
+                action: 'Created fine',
+                description: `${actor.name} created a fine of NPR ${data.amount} — ${data.reason}`,
+            });
+        }
+
+        return fine;
     }
 
     /** Get all fines for a member */
@@ -348,20 +368,37 @@ class FineService {
     }
 
     /** Mark fine as paid */
-    async markPaid(fineId: string, paymentMode: string) {
-        return this.prisma.fine.update({
+    async markPaid(fineId: string, paymentMode: string, actor?: Actor) {
+        const fine = await this.prisma.fine.update({
             where: { id: fineId },
             data: {
                 status: 'PAID',
                 paidDate: new Date(),
                 paymentMode: paymentMode as any,
             },
-        });
+            include: { member: { select: { groupId: true } } }
+        }) as any;
+
+        if (actor) {
+            await activityService.create({
+                group: { connect: { id: fine.member.groupId } },
+                activityType: 'CONFIRM',
+                entityType: 'FINE',
+                entityId: fine.id,
+                actorId: actor.id,
+                actorName: actor.name,
+                actorRole: actor.role as any,
+                action: 'Marked fine as paid',
+                description: `${actor.name} confirmed payment of NPR ${Number(fine.amount).toLocaleString()} fine via ${paymentMode}`,
+            });
+        }
+
+        return fine;
     }
 
     /** Waive a fine */
-    async waive(fineId: string, waivedBy: string, reason: string) {
-        return this.prisma.fine.update({
+    async waive(fineId: string, waivedBy: string, reason: string, actor?: Actor) {
+        const fine = await this.prisma.fine.update({
             where: { id: fineId },
             data: {
                 status: 'WAIVED',
@@ -370,7 +407,24 @@ class FineService {
                 waiverReason: reason,
                 waivedAt: new Date(),
             },
-        });
+            include: { member: { select: { groupId: true } } }
+        }) as any;
+
+        if (actor) {
+            await activityService.create({
+                group: { connect: { id: fine.member.groupId } },
+                activityType: 'WAIVE',
+                entityType: 'FINE',
+                entityId: fine.id,
+                actorId: actor.id,
+                actorName: actor.name,
+                actorRole: actor.role as any,
+                action: 'Waived fine',
+                description: `${actor.name} waived fine — ${reason}`,
+            });
+        }
+
+        return fine;
     }
 }
 
