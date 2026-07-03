@@ -3,6 +3,10 @@ import prismaService from "../prismaService";
 import activityService from '../Activity/activity.service';
 import transactionService from '../Transaction/transaction.service';
 import balanceService from '../Balance/balance.service';
+import ruleService from '../Rule/rule.service';
+
+const DEFAULT_INTEREST_RATE = 12;
+const DEFAULT_INTEREST_TYPE = 'FLAT';
 
 interface Actor { id: string; name: string; role: string; }
 
@@ -24,8 +28,13 @@ class LoanService {
     }, actor?: Actor): Promise<Loan> {
         const principal = Number(data.principalAmount);
         const duration = Number(data.durationMonths);
-        const interestRate = 12;
-        const interestType = 'FLAT';
+
+        const [activeRule] = await ruleService.getActiveRules(data.groupId);
+        const interestRate = activeRule?.loanInterestRate != null
+            ? Number(activeRule.loanInterestRate)
+            : DEFAULT_INTEREST_RATE;
+        const interestType = activeRule?.loanInterestType ?? DEFAULT_INTEREST_TYPE;
+
         const totalInterest = (principal * interestRate * (duration / 12)) / 100;
         const totalAmount = principal + totalInterest;
         const emiAmount = totalAmount / duration;

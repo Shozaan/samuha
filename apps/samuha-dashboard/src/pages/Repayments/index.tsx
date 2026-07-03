@@ -9,6 +9,10 @@ const fmt = (date: string | Date, opts?: Intl.DateTimeFormatOptions) =>
 
 const isPast = (date: Date) => date < new Date();
 
+// EMI total including any accrued late fine — fine.service stores fineAmount
+// separately on the repayment and never folds it into totalAmount.
+const dueTotal = (r: any) => Number(r.totalAmount) + Number(r.fineAmount ?? 0);
+
 const PAYMENT_MODES = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'ONLINE'];
 
 const statusConfig: Record<string, { label: string; cls: string; icon: React.ElementType }> = {
@@ -40,13 +44,16 @@ function PayModal({ repayment, onClose }: PayModalProps) {
     const updateRepayment = useUpdateRepayment();
     const { activeMemberId } = useGlobalStore();
 
+    const fine = Number(repayment.fineAmount ?? 0);
+    const totalDue = dueTotal(repayment);
+
     const handlePay = () => {
         updateRepayment.mutate({
             id: repayment.id,
             data: {
                 status: 'PAID',
                 paidDate: new Date(),
-                paidAmount: Number(repayment.totalAmount),
+                paidAmount: totalDue,
                 paymentMode,
                 confirmedById: activeMemberId,
                 confirmedAt: new Date(),
@@ -88,8 +95,18 @@ function PayModal({ repayment, onClose }: PayModalProps) {
                         </span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-border">
-                        <span className="text-sm text-muted-foreground">Amount</span>
-                        <span className="text-base font-black text-emerald-600">NPR {Number(repayment.totalAmount).toLocaleString()}</span>
+                        <span className="text-sm text-muted-foreground">EMI Amount</span>
+                        <span className="text-sm font-semibold text-foreground">NPR {Number(repayment.totalAmount).toLocaleString()}</span>
+                    </div>
+                    {fine > 0 && (
+                        <div className="flex justify-between py-2 border-b border-border">
+                            <span className="text-sm text-red-600">Late Fine</span>
+                            <span className="text-sm font-semibold text-red-600">NPR {fine.toLocaleString()}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between py-2 border-b border-border">
+                        <span className="text-sm text-muted-foreground">Total Due</span>
+                        <span className="text-base font-black text-emerald-600">NPR {totalDue.toLocaleString()}</span>
                     </div>
                 </div>
 
@@ -137,7 +154,7 @@ function AdminRepayments() {
     const repayments: any[] = data?.data ?? [];
     const late = repayments.filter(r => r.status === 'LATE' || isPast(new Date(r.dueDate)));
     const pending = repayments.filter(r => r.status === 'PENDING' && !isPast(new Date(r.dueDate)));
-    const totalOutstanding = repayments.reduce((s, r) => s + Number(r.totalAmount), 0);
+    const totalOutstanding = repayments.reduce((s, r) => s + dueTotal(r), 0);
 
     return (
         <div className="space-y-8">
@@ -210,8 +227,13 @@ function AdminRepayments() {
                                                     {fmt(r.dueDate)}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right font-black text-foreground">
-                                                NPR {Number(r.totalAmount).toLocaleString()}
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="font-black text-foreground">NPR {dueTotal(r).toLocaleString()}</span>
+                                                {Number(r.fineAmount ?? 0) > 0 && (
+                                                    <span className="block text-[11px] font-semibold text-red-600">
+                                                        incl. NPR {Number(r.fineAmount).toLocaleString()} fine
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <StatusBadge status={overdue && r.status !== 'PAID' ? 'LATE' : r.status} />
@@ -276,7 +298,7 @@ function MemberRepayments() {
                                 <Calendar className="w-4 h-4 text-primary" />
                                 <Typography variant="small" className="text-primary font-bold text-[11px] uppercase">Next EMI Due</Typography>
                             </div>
-                            <p className="text-3xl font-black text-foreground">NPR {Number(nextEmi.totalAmount).toLocaleString()}</p>
+                            <p className="text-3xl font-black text-foreground">NPR {dueTotal(nextEmi).toLocaleString()}</p>
                             <p className="text-sm font-semibold text-muted-foreground mt-1">
                                 {fmt(nextEmi.dueDate, { weekday: 'long' })}
                             </p>
@@ -365,8 +387,13 @@ function MemberRepayments() {
                                         <td className="px-6 py-4 text-right text-muted-foreground">
                                             NPR {Number(r.interestAmount).toLocaleString()}
                                         </td>
-                                        <td className="px-6 py-4 text-right font-black text-foreground">
-                                            NPR {Number(r.totalAmount).toLocaleString()}
+                                        <td className="px-6 py-4 text-right">
+                                            <span className="font-black text-foreground">NPR {dueTotal(r).toLocaleString()}</span>
+                                            {Number(r.fineAmount ?? 0) > 0 && (
+                                                <span className="block text-[11px] font-semibold text-red-600">
+                                                    incl. NPR {Number(r.fineAmount).toLocaleString()} fine
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-muted-foreground">
                                             {r.paidDate ? fmt(r.paidDate) : '—'}
