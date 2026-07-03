@@ -230,6 +230,9 @@ class LoanService {
                 activityType = 'APPROVE';
                 action = 'Approved loan';
                 description = `${actor.name} approved loan ${updatedLoan.loanNumber} for NPR ${Number(updatedLoan.principalAmount).toLocaleString()}`;
+                if (serviceChargeAmount !== null) {
+                    description += ` — service charge (1%) of NPR ${serviceChargeAmount.toLocaleString()} collected`;
+                }
             } else if (updatedLoan.status === 'ACTIVE') {
                 activityType = 'DISBURSE';
                 action = 'Disbursed loan';

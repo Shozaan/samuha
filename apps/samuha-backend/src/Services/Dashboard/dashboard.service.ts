@@ -101,6 +101,7 @@ class DashboardService {
             availableBalance,
             totalDeposits,
             activeLoans,
+            totalServiceCharges,
             recentActivity
         };
     }

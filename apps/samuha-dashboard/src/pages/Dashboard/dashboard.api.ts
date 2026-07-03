@@ -2,7 +2,7 @@ import axiosInstance from "../../api/apiInstance";
 
 export interface DashboardActivity {
     id: string;
-    type: 'deposit' | 'loan' | 'fine' | 'expense' | 'unknown';
+    type: 'deposit' | 'loan' | 'fine' | 'expense' | 'adjustment' | 'unknown';
     user: string;
     amount: number;
     date: string;
@@ -15,6 +15,7 @@ export interface GroupDashboardStats {
     availableBalance: number;
     totalDeposits: number;
     activeLoans: number;
+    totalServiceCharges: number;
     recentActivity: DashboardActivity[];
 }
 

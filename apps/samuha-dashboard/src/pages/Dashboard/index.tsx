@@ -6,7 +6,8 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     Clock,
-    AlertCircle
+    AlertCircle,
+    Receipt
 } from 'lucide-react';
 import {
     Card,
@@ -64,7 +65,7 @@ export default function Dashboard() {
         { label: 'My Total Deposit', value: formatCurr(memberData?.totalDeposit || 0), icon: Wallet, color: 'text-primary' },
         { label: 'Active Loan', value: formatCurr(memberData?.activeLoan || 0), icon: HandCoins, color: 'text-warning' },
         { label: 'Pending Fines', value: formatCurr(memberData?.pendingFines || 0), icon: AlertCircle, color: 'text-destructive' },
-        { label: 'Next Installment', value: memberData?.nextInstallment ? new Date(memberData.nextInstallment).toLocaleDateString() : 'None', icon: Clock, color: 'text-info' },
+        { label: 'Service Charges', value: formatCurr(groupData?.totalServiceCharges || 0), icon: Receipt, color: 'text-secondary' },
     ];
 
     const contributionStats = [
@@ -165,6 +166,7 @@ export default function Dashboard() {
                                                 {activity.type === 'loan' && '🏦'}
                                                 {activity.type === 'fine' && '⚠️'}
                                                 {activity.type === 'expense' && '🧾'}
+                                                {activity.type === 'adjustment' && '📋'}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div>
