@@ -71,6 +71,20 @@ export const useUpdateLoan = () => {
     });
 };
 
+export const usePendingRepayments = (groupId?: string) =>
+    useQuery({
+        queryKey: ['repayments', 'pending', groupId],
+        queryFn: () => loansApi.getPendingRepayments(groupId!),
+        enabled: !!groupId,
+    });
+
+export const useMemberRepayments = (memberId?: string) =>
+    useQuery({
+        queryKey: ['repayments', 'member', memberId],
+        queryFn: () => loansApi.getMemberRepayments(memberId!),
+        enabled: !!memberId,
+    });
+
 export const useUpdateRepayment = () => {
     const queryClient = useQueryClient();
     const actor = useActor();

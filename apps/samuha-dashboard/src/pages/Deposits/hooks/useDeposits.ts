@@ -3,6 +3,13 @@ import { depositsApi } from '../apis';
 import type { DepositPostData } from '../types';
 import { toast } from '@sujan77/ui-components';
 import { type AxiosError } from 'axios';
+import { useGlobalStore } from '../../../store/store';
+
+const useActor = () => {
+    const { user, activeMemberId, role } = useGlobalStore();
+    if (!activeMemberId || !user?.name) return undefined;
+    return { id: activeMemberId, name: user.name, role: role || 'MEMBER' };
+};
 
 export const useDeposits = (params?: {
     page?: number;
@@ -21,11 +28,13 @@ export const useDeposits = (params?: {
 
 export const useCreateDeposit = () => {
     const queryClient = useQueryClient();
+    const actor = useActor();
 
     return useMutation({
-        mutationFn: (data: DepositPostData) => depositsApi.createDeposit(data),
+        mutationFn: (data: DepositPostData) => depositsApi.createDeposit({ ...data, actor } as any),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['deposits'] });
+            queryClient.invalidateQueries({ queryKey: ['activities'] });
             toast.success("Deposit recorded successfully");
         },
         onError: (error: AxiosError<{ message?: string }>) => {
@@ -37,11 +46,14 @@ export const useCreateDeposit = () => {
 
 export const useUpdateDeposit = () => {
     const queryClient = useQueryClient();
+    const actor = useActor();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: Partial<DepositPostData> }) => depositsApi.updateDeposit(id, data),
+        mutationFn: ({ id, data }: { id: string; data: Partial<DepositPostData> }) =>
+            depositsApi.updateDeposit(id, { ...data, actor } as any),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['deposits'] });
+            queryClient.invalidateQueries({ queryKey: ['activities'] });
             toast.success("Deposit updated successfully");
         },
         onError: (error: AxiosError<{ message?: string }>) => {

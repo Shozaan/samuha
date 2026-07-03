@@ -14,8 +14,8 @@ import LoansList from '../pages/Loans/index';
 import LoanDetails from '../pages/Loans/Details';
 import FinesList from '../pages/Fines/index';
 import ExpensesList from '../pages/Expenses/index';
-import NewExpense from '../pages/Expenses/New';
 import ActivityFeed from '../pages/Activity/index';
+import RepaymentsPage from '../pages/Repayments/index';
 import Reports from '../pages/Reports/index';
 import GroupSettings from '../pages/Settings/GroupSettings';
 import AdminSettings from '../pages/Settings/AdminSettings';
@@ -79,21 +79,16 @@ export const router = createBrowserRouter([
                 element: <LoanDetails />,
             },
             {
+                path: 'repayments',
+                element: <RepaymentsPage />,
+            },
+            {
                 path: 'fines',
                 element: <FinesList />,
             },
             {
                 path: 'expenses',
-                children: [
-                    {
-                        path: '',
-                        element: <ExpensesList />,
-                    },
-                    {
-                        path: 'new',
-                        element: <ProtectedRoute allowedRoles={['admin']}><NewExpense /></ProtectedRoute>,
-                    },
-                ],
+                element: <ExpensesList />,
             },
             {
                 path: 'activity',

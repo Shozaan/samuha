@@ -36,5 +36,15 @@ export const loansApi = {
     updateRepayment: async (id: string, data: any) => {
         const response = await apiInstance.put(`/loans/repayments/${id}`, data);
         return response.data;
-    }
+    },
+
+    getPendingRepayments: async (groupId: string) => {
+        const response = await apiInstance.get('/loans/repayments/pending', { params: { groupId } });
+        return response.data;
+    },
+
+    getMemberRepayments: async (memberId: string) => {
+        const response = await apiInstance.get('/loans/repayments/member', { params: { memberId } });
+        return response.data;
+    },
 };

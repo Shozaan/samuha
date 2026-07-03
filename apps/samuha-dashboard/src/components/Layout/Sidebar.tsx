@@ -12,7 +12,8 @@ import {
     LogOut,
     ChevronLeft,
     PanelLeft,
-    Shield
+    Shield,
+    CreditCard
 } from 'lucide-react';
 import { Button, Typography } from '@sujan77/ui-components';
 import { useAuth } from '../../context/AuthContext';
@@ -25,6 +26,7 @@ const navItems = [
     { icon: Users, label: 'Users', path: '/users', roles: ['admin'] },
     { icon: Wallet, label: 'Deposits', path: '/deposits', roles: ['admin', 'member'] },
     { icon: HandCoins, label: 'Loans', path: '/loans', roles: ['admin', 'member'] },
+    { icon: CreditCard, label: 'Repayments', path: '/repayments', roles: ['admin', 'member'] },
     { icon: AlertCircle, label: 'Fines', path: '/fines', roles: ['admin', 'member'] },
     { icon: ReceiptText, label: 'Expenses', path: '/expenses', roles: ['admin', 'member'] },
     { icon: Activity, label: 'Activity', path: '/activity', roles: ['admin', 'member'] },

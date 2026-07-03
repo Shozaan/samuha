@@ -63,6 +63,9 @@ export default function LoanDetails() {
     else if (nextRepayment) nextEMIStr = new Date(nextRepayment.dueDate).toLocaleDateString();
     
     const emiAmountStr = parseFloat(loan.emiAmount).toLocaleString();
+    const serviceChargeStr = loan.serviceChargeAmount
+        ? parseFloat(loan.serviceChargeAmount).toLocaleString()
+        : undefined;
 
     // For when there are no generated repayments yet (Before active)
     const schedule = hasGeneratedRepayments ? repayments.map((r: any) => ({
@@ -143,6 +146,7 @@ export default function LoanDetails() {
                         remainingStr={remainingStr}
                         interestStr={interestStr}
                         interestType={loan.interestType}
+                        serviceChargeStr={serviceChargeStr}
                     />
 
                     <LoanRepaymentSchedule schedule={schedule} />

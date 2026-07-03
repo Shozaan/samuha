@@ -12,6 +12,7 @@ interface LoanHeaderSummaryProps {
     remainingStr: string;
     interestStr: string;
     interestType: string;
+    serviceChargeStr?: string;
 }
 
 export function LoanHeaderSummary({
@@ -25,7 +26,8 @@ export function LoanHeaderSummary({
     paidPercentage,
     remainingStr,
     interestStr,
-    interestType
+    interestType,
+    serviceChargeStr
 }: LoanHeaderSummaryProps) {
     return (
         <Card className="border-border bg-card">
@@ -51,7 +53,7 @@ export function LoanHeaderSummary({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 mt-8 border-t border-border">
+                <div className={`grid grid-cols-1 gap-6 pt-8 mt-8 border-t border-border ${serviceChargeStr ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
                     <div className="p-5 rounded-2xl bg-muted/30 border border-border">
                         <Typography variant="small" className="text-muted-foreground uppercase text-[10px] font-bold block mb-2">Amount Paid</Typography>
                         <Typography variant="p" className="text-xl font-bold text-foreground">NPR {paidStr}</Typography>
@@ -71,6 +73,13 @@ export function LoanHeaderSummary({
                         <Typography variant="h3" className="text-2xl font-black text-primary">{interestStr}</Typography>
                         <Typography variant="small" className="text-[10px] text-primary/60 font-bold mt-1 uppercase">{interestType}</Typography>
                     </div>
+                    {serviceChargeStr && (
+                        <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+                            <Typography variant="small" className="text-amber-600 uppercase text-[10px] font-bold block mb-2">Service Charge</Typography>
+                            <Typography variant="h3" className="text-2xl font-black text-amber-600">NPR {serviceChargeStr}</Typography>
+                            <Typography variant="small" className="text-[10px] text-amber-600/60 font-bold mt-1 uppercase">1% — Group Earning</Typography>
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>

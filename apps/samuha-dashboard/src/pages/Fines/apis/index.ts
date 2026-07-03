@@ -15,12 +15,12 @@ export const finesApi = {
         const res = await apiInstance.post(`${BASE}`, data);
         return res.data;
     },
-    markPaid: async (fineId: string, paymentMode: string, virtualDetails?: any) => {
-        const res = await apiInstance.put(`${BASE}/${fineId}/pay`, { paymentMode, virtualDetails });
+    markPaid: async (fineId: string, paymentMode: string, virtualDetails?: any, actor?: any) => {
+        const res = await apiInstance.put(`${BASE}/${fineId}/pay`, { paymentMode, virtualDetails, actor });
         return res.data;
     },
-    waive: async (fineId: string, waivedBy: string, reason: string) => {
-        const res = await apiInstance.put(`${BASE}/${fineId}/waive`, { waivedBy, reason });
+    waive: async (fineId: string, waivedBy: string, reason: string, actor?: any) => {
+        const res = await apiInstance.put(`${BASE}/${fineId}/waive`, { waivedBy, reason, actor });
         return res.data;
     },
     runEngine: async () => {
